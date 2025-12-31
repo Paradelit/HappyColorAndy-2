@@ -597,7 +597,7 @@ const Game = {
 
         for(let i=0; i<w*h; i++) {
             const idx = i*4;
-            if (imgData[idx] < 250 || imgData[idx+1] < 250 || imgData[idx+2] < 250) {
+            if (imgData[idx+3] > 200 && (imgData[idx] < 250 || imgData[idx+1] < 250 || imgData[idx+2] < 250)) {
                 lDat[idx+3] = 0; 
             }
         }
