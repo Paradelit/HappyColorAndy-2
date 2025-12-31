@@ -65,7 +65,6 @@ function setSyncCode(code) {
 // ==========================================
 
 async function syncToCloud() {
-    // CORRECCIÓN: Verificar firebaseDb en lugar de db
     if (!syncEnabled || !firebaseDb) return false;
     
     try {
@@ -91,8 +90,10 @@ async function syncToCloud() {
             }
         }
         
-        // CORRECCIÓN: Usar firebaseDb.collection
         await firebaseDb.collection('sync').doc(code).set(syncData);
+        
+        // Guardar timestamp local
+        localStorage.setItem('last_local_sync', syncData.lastSync.toString());
         
         console.log('✅ Datos sincronizados con la nube');
         return true;
@@ -103,11 +104,9 @@ async function syncToCloud() {
 }
 
 async function syncFromCloud(code) {
-    // CORRECCIÓN: Verificar firebaseDb en lugar de db
     if (!syncEnabled || !firebaseDb) return false;
     
     try {
-        // CORRECCIÓN: Usar firebaseDb.collection
         const doc = await firebaseDb.collection('sync').doc(code).get();
         
         if (!doc.exists) {
@@ -132,6 +131,11 @@ async function syncFromCloud(code) {
         
         setSyncCode(code);
         
+        // Actualizar timestamp local
+        if (syncData.lastSync) {
+            localStorage.setItem('last_local_sync', syncData.lastSync.toString());
+        }
+        
         console.log('✅ Datos restaurados desde la nube');
         return true;
     } catch (error) {
@@ -140,19 +144,65 @@ async function syncFromCloud(code) {
     }
 }
 
+// Pull de datos desde la nube (sin cambiar código)
+async function pullFromCloud() {
+    if (!syncEnabled || !firebaseDb) return false;
+    
+    try {
+        const code = getSyncCode();
+        const doc = await firebaseDb.collection('sync').doc(code).get();
+        
+        if (!doc.exists) return false;
+        
+        const syncData = doc.data();
+        const serverTime = syncData.lastSync || 0;
+        const localTime = parseInt(localStorage.getItem('last_local_sync') || '0');
+        
+        // Solo actualizar si los datos del servidor son más recientes
+        if (serverTime > localTime) {
+            console.log('📥 Datos del servidor más recientes, actualizando...');
+            
+            if (syncData.completed) {
+                Object.keys(syncData.completed).forEach(nivelId => {
+                    localStorage.setItem('completed_' + nivelId, 'true');
+                });
+            }
+            
+            if (syncData.savedProgress) {
+                for (let nivelId in syncData.savedProgress) {
+                    const imgData = syncData.savedProgress[nivelId];
+                    await saveToDB(nivelId, imgData);
+                }
+            }
+            
+            localStorage.setItem('last_local_sync', serverTime.toString());
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('❌ Error al hacer pull:', error);
+        return false;
+    }
+}
+
 // ==========================================
-// 🔄 SINCRONIZACIÓN AUTOMÁTICA
+// 🔄 SINCRONIZACIÓN AUTOMÁTICA Y TRIGGERS
 // ==========================================
 
 let syncInterval = null;
+let lastSyncTime = 0;
+const MIN_SYNC_INTERVAL = 5000; // Mínimo 5 segundos entre syncs para no saturar
 
 function startAutoSync() {
     if (!syncEnabled) return;
     
+    // Sync cada 30 segundos como respaldo
     syncInterval = setInterval(() => {
         syncToCloud();
     }, 30000);
     
+    // Sync inicial
     syncToCloud();
 }
 
@@ -161,6 +211,18 @@ function stopAutoSync() {
         clearInterval(syncInterval);
         syncInterval = null;
     }
+}
+
+// Sincronización inteligente (con throttle para evitar spam)
+async function syncNow() {
+    const now = Date.now();
+    if (now - lastSyncTime < MIN_SYNC_INTERVAL) {
+        console.log('⏳ Sync muy reciente, esperando...');
+        return;
+    }
+    
+    lastSyncTime = now;
+    await syncToCloud();
 }
 
 // ==========================================
@@ -285,23 +347,86 @@ const Sync = {
     restoreFromCode,
     getSyncCode,
     startAutoSync,
-    stopAutoSync
+    stopAutoSync,
+    syncNow,        // Nueva: sincronización inmediata con throttle
+    pullFromCloud   // Nueva: pull automático
 };
 
+// Inicializar y hacer pull al cargar la app
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        Sync.init().then(success => {
-            if (success) {
-                Sync.startAutoSync();
+    document.addEventListener('DOMContentLoaded', async () => {
+        const success = await Sync.init();
+        if (success) {
+            // Primero hacer pull para obtener datos actualizados
+            const pulled = await Sync.pullFromCloud();
+            if (pulled && typeof renderGallery === 'function') {
+                renderGallery(); // Refrescar galería si hubo cambios
             }
-        });
+            // Luego iniciar auto-sync
+            Sync.startAutoSync();
+        }
     });
 } else {
-    Sync.init().then(success => {
+    Sync.init().then(async success => {
         if (success) {
+            const pulled = await Sync.pullFromCloud();
+            if (pulled && typeof renderGallery === 'function') {
+                renderGallery();
+            }
             Sync.startAutoSync();
         }
     });
 }
+
+// ==========================================
+// 🎯 LISTENERS PARA SINCRONIZACIÓN AUTOMÁTICA
+// ==========================================
+
+// 1. Sincronizar antes de cerrar/recargar la app
+window.addEventListener('beforeunload', () => {
+    if (syncEnabled) {
+        // Intentar sync sincrónico para que alcance antes del cierre
+        Sync.syncNow();
+    }
+});
+
+// 2. Sincronizar cuando la app pasa a background
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && syncEnabled) {
+        // App oculta: sincronizar cambios locales
+        Sync.syncNow();
+    } else if (!document.hidden && syncEnabled) {
+        // App visible: hacer pull por si hay cambios de otro dispositivo
+        Sync.pullFromCloud().then(pulled => {
+            if (pulled && typeof renderGallery === 'function') {
+                renderGallery();
+            }
+        });
+    }
+});
+
+// 3. Sincronizar en pausa/resume (móviles, especialmente iOS)
+window.addEventListener('pagehide', () => {
+    if (syncEnabled) Sync.syncNow();
+});
+
+window.addEventListener('pageshow', (event) => {
+    if (syncEnabled) {
+        // Si la página viene de bfcache (back-forward cache), hacer pull
+        Sync.pullFromCloud().then(pulled => {
+            if (pulled && typeof renderGallery === 'function') {
+                renderGallery();
+            }
+        });
+    }
+});
+
+// 4. Detectar cuando vuelve la conexión a internet
+window.addEventListener('online', () => {
+    if (syncEnabled) {
+        console.log('🌐 Conexión restaurada, sincronizando...');
+        Sync.syncNow();
+    }
+});
 
 window.Sync = Sync;
