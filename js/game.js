@@ -858,20 +858,79 @@ const Game = {
         this.state.isVictoryShown = true;
         localStorage.setItem('completed_' + this.state.currentLevel.id, 'true');
         
+        // 1. FADE OUT de highlight y líneas (suave y lento)
+        this.ui.hlCanvas.style.transition = 'opacity 1s ease';
+        this.ui.linesCanvas.style.transition = 'opacity 1.5s ease';
+        this.ui.hlCanvas.style.opacity = '0';
+        this.ui.linesCanvas.style.opacity = '0';
+        
+        // 2. Sonido de victoria
         if(typeof updateSoundState === 'function') updateSoundState(false);
         if(typeof playEffect === 'function') playEffect(sVictory);
         
-        this.ui.hlCanvas.style.opacity = '0'; 
-        this.ui.linesCanvas.style.opacity = '0'; 
-
-        this.ui.canvas.classList.add('framed-art');
-
-        this.ui.victoryTitle.innerText = this.state.currentLevel.nombreCompleto;
-        this.ui.victoryCanvas.width = this.assets.imgSolucion.width;
-        this.ui.victoryCanvas.height = this.assets.imgSolucion.height;
-        this.ui.victoryCanvas.getContext('2d').drawImage(this.assets.imgSolucion, 0, 0);
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-        setTimeout(() => { this.ui.victoryModal.classList.remove('hidden'); }, 800);
+        // 3. Después de 300ms, hacer ZOOM OUT suave para ver la imagen completa
+        setTimeout(() => {
+            const w = this.ui.canvas.width;
+            const h = this.ui.canvas.height;
+            const vW = this.ui.viewport.clientWidth;
+            const vH = this.ui.viewport.clientHeight;
+            
+            // Calcular escala para que se vea completa con un margen de 40px
+            const targetScale = Math.min((vW - 80) / w, (vH - 80) / h);
+            const targetX = (vW - w * targetScale) / 2;
+            const targetY = (vH - h * targetScale) / 2;
+            
+            // Animar el zoom out suavemente
+            this.ui.zoomLayer.style.transition = 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            this.state.scale = targetScale;
+            this.state.pX = targetX;
+            this.state.pY = targetY;
+            this.updateTransform();
+            
+            // 4. Agregar el marco dorado después del zoom
+            setTimeout(() => {
+                this.ui.canvas.classList.add('framed-art');
+            }, 800);
+        }, 300);
+        
+        // 5. Primera ráfaga de confetti
+        setTimeout(() => {
+            confetti({ 
+                particleCount: 100, 
+                spread: 70, 
+                origin: { y: 0.6 },
+                colors: ['#d63384', '#667eea', '#764ba2', '#f093fb', '#4facfe']
+            });
+        }, 500);
+        
+        // 6. Segunda ráfaga de confetti
+        setTimeout(() => {
+            confetti({ 
+                particleCount: 80, 
+                spread: 100, 
+                origin: { y: 0.7 },
+                colors: ['#FFD700', '#FFA500', '#FF69B4', '#00CED1']
+            });
+        }, 900);
+        
+        // 7. Tercera ráfaga más grande
+        setTimeout(() => {
+            confetti({ 
+                particleCount: 120, 
+                spread: 90, 
+                origin: { y: 0.5 },
+                colors: ['#d63384', '#667eea', '#FFD700', '#4facfe', '#FF69B4']
+            });
+        }, 1400);
+        
+        // 8. Mostrar el modal después de toda la animación
+        setTimeout(() => {
+            this.ui.victoryTitle.innerText = this.state.currentLevel.nombreCompleto;
+            this.ui.victoryCanvas.width = this.assets.imgSolucion.width;
+            this.ui.victoryCanvas.height = this.assets.imgSolucion.height;
+            this.ui.victoryCanvas.getContext('2d').drawImage(this.assets.imgSolucion, 0, 0);
+            this.ui.victoryModal.classList.remove('hidden');
+        }, 2500);
     },
 
     closeVictory: function() {
@@ -902,7 +961,12 @@ const Game = {
             history.back();
         }
 
+        // Resetear transiciones y opacidades
         this.ui.hlCanvas.classList.remove('smart-pulse');
+        this.ui.hlCanvas.style.transition = '';
+        this.ui.linesCanvas.style.transition = '';
+        this.ui.zoomLayer.style.transition = '';
+        
         this.ui.screen.classList.add('hidden');
         document.getElementById('gallery-screen').classList.remove('hidden');
         
