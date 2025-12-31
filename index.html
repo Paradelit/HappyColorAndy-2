@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Andy's Happy Color</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        /* OPTIMIZACIONES MÓVIL: Forzar aceleración por hardware */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+
+        body { 
+            margin: 0; background: #f0f4f8; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            height: 100dvh; width: 100vw; overflow: hidden; 
+            display: flex; flex-direction: column;
+            user-select: none; -webkit-user-select: none;
+            position: fixed;
+            overscroll-behavior: none;
+        }
+
+        body.scrolling * {
+            animation-play-state: paused !important;
+            transition: none !important;
+        }
+
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; background: #f0f4f8;
+            transition: transform 0.3s ease; z-index: 10;
+        }
+        .hidden { display: none !important; }
+
+        /* GALERÍA */
+        #gallery-screen { 
+            z-index: 20; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            align-items: center; 
+            -webkit-overflow-scrolling: touch;
+        }
+        .gallery-content { 
+            padding: 20px; 
+            width: 100%; 
+            max-width: 600px; 
+            box-sizing: border-box; 
+        }
+        .gallery-header-block { 
+            text-align: center; 
+            margin: 30px 0 20px 0; 
+            position: relative; 
+        }
+        .gallery-title { 
+            color: #d63384; 
+            font-size: 1.8rem; 
+            margin: 0; 
+        }
+        .gallery-subtitle { 
+            color: #666; 
+            font-size: 0.9rem; 
+            margin-top: 10px; 
+        }
+        .app-title-small { 
+            color: #999; 
+            font-size: 0.75rem; 
+            margin-top: 3px; 
+            font-weight: normal; 
+        }
+        .gallery-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 20px; 
+            width: 100%; 
+        }
+        .gallery-item {
+            background: white; 
+            border-radius: 15px; 
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            cursor: pointer;
+            display: flex; 
+            flex-direction: column; 
+            position: relative;
+            transform: translateZ(0);
+            will-change: transform;
+            transition: all 0.3s ease;
+        }
+        
+        /* NIVEL DESBLOQUEADO */
+        .gallery-item.unlocked:active { 
+            transform: scale(0.98) translateZ(0); 
+        }
+        
+        /* NIVEL BLOQUEADO */
+        .gallery-item.locked {
+            background: #f5f5f5;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+            cursor: not-allowed;
+        }
+        .gallery-item.locked:active {
+            transform: scale(0.95) translateZ(0);
+        }
+        
+        .locked-wrapper {
+            position: relative;
+            filter: grayscale(0.8) brightness(1.1);
+        }
+        
+        .lock-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            z-index: 5;
+        }
+        
+        .lock-icon {
+            font-size: 50px;
+            opacity: 0.6;
+            animation: lockPulse 2s ease-in-out infinite;
+        }
+        
+        .lock-text {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .unlock-hint {
+            font-size: 0.75rem;
+            color: #aaa;
+            text-align: center;
+            padding: 0 10px;
+            line-height: 1.3;
+        }
+        
+        @keyframes lockPulse {
+            0%, 100% { 
+                transform: scale(1); 
+                opacity: 0.6; 
+            }
+            50% { 
+                transform: scale(1.1); 
+                opacity: 0.8; 
+            }
+        }
+        
+        .thumb-preview { 
+            width: 100%; 
+            height: 160px; 
+            object-fit: contain; 
+            background: white; 
+            padding: 10px; 
+            box-sizing: border-box; 
+            border-bottom: 1px solid #eee;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        
+        .check-badge {
+            position: absolute; 
+            top: 10px; 
+            right: 10px;
+            background: #4CAF50; 
+            color: white; 
+            border-radius: 50%;
+            width: 30px; 
+            height: 30px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            font-size: 16px; 
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+            z-index: 10;
+            font-weight: bold;
+        }
+        
+        .progress-badge {
+            position: absolute; 
+            top: 10px; 
+            right: 10px;
+            background: #FF9800; 
+            color: white; 
+            border-radius: 50%;
+            width: 30px; 
+            height: 30px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            font-size: 16px; 
+            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+            z-index: 10;
+            animation: wiggle 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+        }
+        
+        .thumb-title { 
+            padding: 15px; 
+            font-weight: bold; 
+            color: #444; 
+            text-align: center; 
+        }
+        
+        .gallery-sound-btn {
+            position: absolute; 
+            top: 15px; 
+            right: 15px;
+            background: white; 
+            border: none; 
+            border-radius: 50%;
+            width: 40px; 
+            height: 40px; 
+            font-size: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            cursor: pointer; 
+            z-index: 50;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            color: #d63384;
+            transform: translateZ(0);
+        }
+
+        /* Animaciones para modales */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* JUEGO */
+        header {
+            flex: 0 0 50px; 
+            background: white; 
+            display: flex;
+            align-items: center; 
+            justify-content: space-between;
+            padding: 0 10px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            z-index: 500; 
+            position: relative;
+        }
+        h1 { 
+            color: #d63384; 
+            font-size: 1rem; 
+            margin: 0 10px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            flex-grow: 1; 
+            text-align: center; 
+        }
+        .header-btns { 
+            display: flex; 
+            gap: 8px; 
+        }
+
+        button.icon-btn {
+            background: #eee; 
+            border: none; 
+            border-radius: 50%;
+            width: 35px; 
+            height: 35px; 
+            font-size: 18px; 
+            cursor: pointer;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            transition: all 0.2s ease;
+            transform: translateZ(0);
+            will-change: transform;
+        }
+        button.icon-btn:hover { 
+            background: #ddd; 
+            transform: scale(1.1) translateZ(0); 
+        }
+        button.icon-btn:active { 
+            background: #d63384; 
+            color: white; 
+            transform: scale(0.95) translateZ(0); 
+        }
+        
+        #btn-hint, #btn-magic { 
+            display: none; 
+        }
+        #btn-hint.active, #btn-magic.active { 
+            display: flex; 
+            animation: popIn 0.3s; 
+        }
+        
+        #btn-magic {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        #progress-container { 
+            width: 100%; 
+            height: 4px; 
+            background: #e0e0e0; 
+            position: relative; 
+            z-index: 450; 
+        }
+        #progress-bar { 
+            height: 100%; 
+            background: #d63384; 
+            width: 0%; 
+            transition: width 0.3s ease; 
+        }
+
+        #viewport { 
+            flex-grow: 1; 
+            position: relative; 
+            overflow: hidden; 
+            background: #e0e0e0; 
+        }
+        #zoom-layer { 
+            transform-origin: 0 0; 
+            transition: none; 
+        }
+        #shake-layer {
+            position: relative;
+        }
+        #shake-layer.shake {
+            animation: shake 0.3s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        canvas {
+            position: absolute; 
+            top: 0; 
+            left: 0;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #lienzo { 
+            z-index: 1; 
+        }
+        #lines-canvas { 
+            z-index: 2; 
+            pointer-events: none; 
+            transition: opacity 0.5s ease;
+        }
+        #highlight-canvas { 
+            z-index: 3; 
+            pointer-events: none; 
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+        
+        #highlight-canvas.smart-pulse {
+            animation: highlightPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes highlightPulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        .paleta-container {
+            flex: 0 0 100px; 
+            background: white; 
+            display: flex; 
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            padding: 10px;
+            overflow-x: auto; 
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        .paleta {
+            display: flex; 
+            gap: 12px; 
+            padding: 5px 0;
+        }
+        .color-btn {
+            --btn-color: #ccc;
+            --progress: 0%;
+            min-width: 60px; 
+            height: 60px; 
+            border-radius: 15px;
+            position: relative; 
+            cursor: pointer;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+            transition: all 0.2s ease;
+            background: var(--btn-color);
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            border: 3px solid transparent;
+            transform: translateZ(0);
+            overflow: hidden;
+        }
+        .color-btn::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--progress);
+            background: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+            transition: height 0.3s ease;
+        }
+        .color-btn:active {
+            transform: scale(0.9) translateZ(0);
+        }
+        .color-btn.selected {
+            border-color: #d63384;
+            box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.2), 0 4px 12px rgba(0,0,0,0.2);
+            transform: scale(1.1) translateZ(0);
+        }
+        .color-btn.completed {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .color-btn.completed::before {
+            display: none;
+        }
+        .color-btn.completed::after {
+            content: '✓';
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .color-number {
+            font-size: 1rem;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        #victory-modal {
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8); 
+            z-index: 2000;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+        }
+        .victory-content {
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px;
+            text-align: center; 
+            max-width: 90%; 
+            max-height: 80%;
+            overflow: auto; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            animation: fadeInFrame 0.5s ease;
+        }
+        .victory-content h2 {
+            color: #d63384; 
+            margin: 0 0 10px 0; 
+            font-size: 1.8rem;
+        }
+        .victory-content p {
+            color: #666; 
+            margin: 0 0 15px 0; 
+            font-size: 1rem;
+        }
+        .victory-memory-title {
+            color: #333; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            margin-bottom: 15px;
+        }
+        #victory-canvas {
+            max-width: 100%; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            image-rendering: pixelated;
+        }
+
+        @keyframes fadeInFrame { 
+            from { opacity: 0; transform: scale(0.9); } 
+            to { opacity: 1; transform: scale(1); } 
+        }
+        
+        .victory-btn { 
+            background: #d63384; 
+            color: white; 
+            border: none; 
+            padding: 10px 25px; 
+            font-size: 1rem; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            margin-top: 20px;
+            transform: translateZ(0);
+        }
+        
+        #ptr-indicator {
+            height: 0; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            background: #f0f4f8; 
+            color: #d63384; 
+            font-weight: bold; 
+            transition: height 0.2s;
+        }
+        
+        #loading-overlay {
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(255,255,255,0.9); 
+            z-index: 1000;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            font-weight: bold; 
+            color: #666;
+        }
+
+        /* MODAL DE CONFIRMACIÓN */
+        #confirm-modal {
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(0,0,0,0.5); 
+            z-index: 3000;
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+        }
+        .confirm-box {
+            background: white; 
+            width: 85%; 
+            max-width: 320px;
+            padding: 25px; 
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            text-align: center; 
+            animation: popIn 0.2s;
+            transform: translateZ(0);
+        }
+        .confirm-title { 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            color: #333; 
+            margin-bottom: 10px; 
+        }
+        .confirm-text { 
+            color: #666; 
+            font-size: 0.95rem; 
+            margin-bottom: 20px; 
+            line-height: 1.4; 
+        }
+        .confirm-check-container {
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            margin-bottom: 20px; 
+            font-size: 0.85rem; 
+            color: #555;
+        }
+        .confirm-check-container input { 
+            margin-right: 8px; 
+            transform: scale(1.2); 
+        }
+        .confirm-actions { 
+            display: flex; 
+            justify-content: space-between; 
+            gap: 10px; 
+        }
+        .confirm-btn {
+            flex: 1; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 8px;
+            font-size: 1rem; 
+            cursor: pointer;
+            transform: translateZ(0);
+            transition: transform 0.1s;
+        }
+        .confirm-btn:active {
+            transform: scale(0.95) translateZ(0);
+        }
+        .confirm-btn.cancel { 
+            background: #eee; 
+            color: #333; 
+        }
+        .confirm-btn.ok { 
+            background: #d63384; 
+            color: white; 
+        }
+        
+        .framed-art {
+            border: 5px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3), inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="gallery-screen" class="screen">
+        <button id="btn-sound-gallery" class="gallery-sound-btn" title="Sonido">🔈</button>
+        <div id="ptr-indicator">⬇️ Suelta para recargar</div>
+
+        <div class="gallery-content">
+            <div class="gallery-header-block">
+                <h1 class="gallery-title">🎨 Recuerdos</h1>
+                <div class="app-title-small">Andy's Happy Color: Color by Number</div>
+                <div class="gallery-subtitle" id="gallery-counter">Completados: 0/0</div>
+
+                <button onclick="Tutorial.reset(); Game.loadLevel(typeof getFirstUncompletedLevel === 'function' ? getFirstUncompletedLevel() : 0);" style="
+                    margin-top: 15px; background: white; border: 2px solid #d63384; 
+                    color: #d63384; padding: 10px 20px; border-radius: 20px; 
+                    font-weight: 600; cursor: pointer; transform: translateZ(0);">
+                    📚 Ver Tutorial
+                </button>
+
+            </div>
+
+            <div class="gallery-grid" id="gallery-grid"></div>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen hidden">
+        <header>
+            <button id="btn-back" class="icon-btn" title="Volver">⬅️</button>
+            <h1>Foto</h1>
+            <div class="header-btns">
+                <button id="btn-sound-game" class="icon-btn" title="Sonido">🔈</button>
+                <button id="btn-hint" class="icon-btn" title="Ayuda">💡</button>
+                <button id="btn-magic" class="icon-btn" title="Completar">✨</button>
+                <button id="btn-download" class="icon-btn" title="Descargar">💾</button>
+                <button id="btn-reset" class="icon-btn" title="Borrar">🗑️</button>
+                <button id="btn-solucion" class="icon-btn" title="Ver">👁️</button>
+            </div>
+        </header>
+
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+
+        <div id="viewport">
+            <div id="loading-overlay" class="hidden">Cargando foto...</div>
+            <div id="zoom-layer">
+                <div id="shake-layer">
+                    <canvas id="lienzo"></canvas>
+                    <canvas id="lines-canvas"></canvas>
+                    <canvas id="highlight-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="paleta-container">
+            <div class="paleta" id="paleta"></div>
+        </div>
+    </div>
+
+    <div id="victory-modal" class="hidden">
+        <div class="victory-content">
+            <h2>¡Felicidades! 🎉</h2>
+            <p>Has completado este recuerdo.</p>
+            <div class="victory-memory-title" id="victory-title"></div>
+            <canvas id="victory-canvas"></canvas>
+            <button id="btn-close-victory" class="victory-btn">¡Genial!</button>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="hidden">
+        <div class="confirm-box">
+            <div class="confirm-title" id="c-title">Confirmar</div>
+            <div class="confirm-text" id="c-text">¿Estás seguro?</div>
+            <div class="confirm-check-container">
+                <input type="checkbox" id="c-dont-show">
+                <label for="c-dont-show">No volver a preguntar</label>
+            </div>
+            <div class="confirm-actions">
+                <button class="confirm-btn cancel" id="c-btn-cancel">Cancelar</button>
+                <button class="confirm-btn ok" id="c-btn-ok">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/tutorial.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/gallery.js"></script>
+
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('SW registrado'))
+                .catch(err => console.log('SW error:', err));
+        });
+    }
+
+    window.requestIdleCallback = window.requestIdleCallback || function(cb) {
+        return setTimeout(cb, 1);
+    };
+    </script>
+</body>
+</html>
