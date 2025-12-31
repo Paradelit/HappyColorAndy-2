@@ -2,13 +2,6 @@
 // ☁️ SISTEMA DE SINCRONIZACIÓN (sync.js)
 // ==========================================
 
-// CONFIGURACIÓN DE FIREBASE
-// IMPORTANTE: Reemplaza estos valores con los de tu proyecto Firebase
-// Ve a: https://console.firebase.google.com/
-// 1. Crea un proyecto nuevo (gratis)
-// 2. Ve a "Project Settings" > "Your apps" > "Web app"
-// 3. Copia la configuración aquí:
-
 const firebaseConfig = {
   apiKey: "AIzaSyCUc7iX73rzjz0-6s_3hnxAHaqHs5hzi4U",
   authDomain: "andy-happy-color.firebaseapp.com",
@@ -20,7 +13,7 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-let db = null;
+let firebaseDb = null;
 let syncEnabled = false;
 
 async function initFirebase() {
@@ -36,7 +29,7 @@ async function initFirebase() {
             firebase.initializeApp(firebaseConfig);
         }
         
-        db = firebase.firestore();
+        firebaseDb = firebase.firestore();
         syncEnabled = true;
         console.log('✅ Firebase inicializado correctamente');
         return true;
