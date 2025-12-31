@@ -12,6 +12,10 @@
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="manifest" href="manifest.json">
 
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     
     <style>
@@ -757,6 +761,302 @@
                 transition-duration: 0.01ms !important;
             }
         }
+
+        /* ==========================================
+           ☁️ ESTILOS DE SINCRONIZACIÓN
+           ========================================== */
+
+        .sync-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 3000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .sync-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 25px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            animation: syncSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes syncSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .sync-header {
+            background: linear-gradient(135deg, #d63384 0%, #c62368 100%);
+            padding: 20px 25px;
+            border-radius: 25px 25px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .sync-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .sync-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .sync-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .sync-body {
+            padding: 30px 25px;
+        }
+
+        .sync-section {
+            margin-bottom: 25px;
+        }
+
+        .sync-section h3 {
+            color: #d63384;
+            font-size: 1.2rem;
+            margin: 0 0 15px 0;
+            font-weight: 600;
+        }
+
+        .sync-help {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 10px 0;
+            line-height: 1.4;
+        }
+
+        .sync-code-display {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 8px;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 15px 0;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            user-select: all;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sync-code-display:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .sync-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 8px;
+            text-align: center;
+            border: 3px solid #e0e0e0;
+            border-radius: 15px;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .sync-input:focus {
+            outline: none;
+            border-color: #d63384;
+            box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.1);
+        }
+
+        .sync-btn {
+            width: 100%;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .sync-btn-copy {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .sync-btn-copy:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .sync-btn-copy:active {
+            transform: translateY(0);
+        }
+
+        .sync-btn-primary {
+            background: linear-gradient(135deg, #d63384 0%, #c62368 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(214, 51, 132, 0.3);
+        }
+
+        .sync-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(214, 51, 132, 0.4);
+        }
+
+        .sync-btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .sync-divider {
+            text-align: center;
+            color: #999;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .sync-divider::before,
+        .sync-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #e0e0e0, transparent);
+        }
+
+        .sync-divider::before {
+            left: 0;
+        }
+
+        .sync-divider::after {
+            right: 0;
+        }
+
+        .sync-footer {
+            background: #f8f9fa;
+            padding: 15px 25px;
+            border-radius: 0 0 25px 25px;
+            text-align: center;
+        }
+
+        .sync-footer p {
+            margin: 0;
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        .sync-toast {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+            z-index: 4000;
+            transition: bottom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            white-space: nowrap;
+            max-width: 90%;
+        }
+
+        .sync-toast.show {
+            bottom: 30px;
+        }
+
+        .gallery-sync-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            cursor: pointer;
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            transform: translateZ(0);
+            transition: all 0.3s ease;
+        }
+
+        .gallery-sync-btn:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .gallery-sync-btn:active {
+            transform: translateY(0) scale(0.95);
+        }
+
+        @media (max-width: 600px) {
+            .sync-content {
+                width: 95%;
+                max-height: 90vh;
+            }
+            
+            .sync-body {
+                padding: 25px 20px;
+            }
+            
+            .sync-code-display {
+                font-size: 2rem;
+                letter-spacing: 6px;
+                padding: 15px;
+            }
+            
+            .sync-input {
+                font-size: 1.5rem;
+                letter-spacing: 6px;
+            }
+        }
     </style>
 </head>
 
@@ -764,6 +1064,7 @@
 
     <div id="gallery-screen" class="screen">
         <button id="btn-sound-gallery" class="gallery-sound-btn" title="Sonido">🔈</button>
+        <button id="btn-sync" class="gallery-sync-btn" title="Sincronización" onclick="Sync.showSyncModal()">☁️</button>
         <div id="ptr-indicator">⬇️ Suelta para recargar</div>
 
         <div class="gallery-content">
@@ -850,6 +1151,7 @@
     <script src="js/tutorial.js"></script>
     <script src="js/game.js"></script>
     <script src="js/gallery.js"></script>
+    <script src="js/sync.js"></script>
 
     <script>
     if ('serviceWorker' in navigator) {
