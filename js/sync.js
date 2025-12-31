@@ -12,23 +12,22 @@ const firebaseConfig = {
   measurementId: "G-1MGHS9YLSM"
 };
 
-// Inicializar Firebase
-let firebaseDb = null;
+// Inicializar Firebase con un nombre único para evitar conflictos con db.js
+let firebaseDb = null; 
 let syncEnabled = false;
 
 async function initFirebase() {
     try {
-        // Verificar si Firebase está cargado
         if (typeof firebase === 'undefined') {
             console.warn('Firebase no cargado, sincronización deshabilitada');
             return false;
         }
         
-        // Inicializar Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         
+        // Usamos firebaseDb en lugar de db
         firebaseDb = firebase.firestore();
         syncEnabled = true;
         console.log('✅ Firebase inicializado correctamente');
@@ -45,7 +44,6 @@ async function initFirebase() {
 // ==========================================
 
 function generateSyncCode() {
-    // Generar código de 6 dígitos
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
@@ -67,22 +65,18 @@ function setSyncCode(code) {
 // ==========================================
 
 async function syncToCloud() {
-    if (!syncEnabled || !db) return false;
+    // CORRECCIÓN: Verificar firebaseDb en lugar de db
+    if (!syncEnabled || !firebaseDb) return false;
     
     try {
         const code = getSyncCode();
         
-        // Recopilar todos los datos locales
         const syncData = {
-            // Niveles completados
             completed: {},
-            // Progreso guardado en IndexedDB
             savedProgress: {},
-            // Timestamp de última actualización
             lastSync: Date.now()
         };
         
-        // Obtener niveles completados
         niveles.forEach(nivel => {
             const isCompleted = localStorage.getItem('completed_' + nivel.id) === 'true';
             if (isCompleted) {
@@ -90,7 +84,6 @@ async function syncToCloud() {
             }
         });
         
-        // Obtener progreso guardado de IndexedDB
         for (let nivel of niveles) {
             const savedImg = await loadFromDB(nivel.id);
             if (savedImg) {
@@ -98,8 +91,8 @@ async function syncToCloud() {
             }
         }
         
-        // Guardar en Firebase
-        await db.collection('sync').doc(code).set(syncData);
+        // CORRECCIÓN: Usar firebaseDb.collection
+        await firebaseDb.collection('sync').doc(code).set(syncData);
         
         console.log('✅ Datos sincronizados con la nube');
         return true;
@@ -110,11 +103,12 @@ async function syncToCloud() {
 }
 
 async function syncFromCloud(code) {
-    if (!syncEnabled || !db) return false;
+    // CORRECCIÓN: Verificar firebaseDb en lugar de db
+    if (!syncEnabled || !firebaseDb) return false;
     
     try {
-        // Obtener datos de Firebase
-        const doc = await db.collection('sync').doc(code).get();
+        // CORRECCIÓN: Usar firebaseDb.collection
+        const doc = await firebaseDb.collection('sync').doc(code).get();
         
         if (!doc.exists) {
             console.warn('⚠️ No se encontraron datos para el código:', code);
@@ -123,14 +117,12 @@ async function syncFromCloud(code) {
         
         const syncData = doc.data();
         
-        // Restaurar niveles completados
         if (syncData.completed) {
             Object.keys(syncData.completed).forEach(nivelId => {
                 localStorage.setItem('completed_' + nivelId, 'true');
             });
         }
         
-        // Restaurar progreso guardado
         if (syncData.savedProgress) {
             for (let nivelId in syncData.savedProgress) {
                 const imgData = syncData.savedProgress[nivelId];
@@ -138,7 +130,6 @@ async function syncFromCloud(code) {
             }
         }
         
-        // Guardar el código
         setSyncCode(code);
         
         console.log('✅ Datos restaurados desde la nube');
@@ -158,12 +149,10 @@ let syncInterval = null;
 function startAutoSync() {
     if (!syncEnabled) return;
     
-    // Sincronizar cada 30 segundos
     syncInterval = setInterval(() => {
         syncToCloud();
     }, 30000);
     
-    // Sincronizar inmediatamente
     syncToCloud();
 }
 
@@ -221,7 +210,6 @@ function showSyncModal() {
     
     document.body.appendChild(modal);
     
-    // Cerrar al hacer clic fuera
     modal.onclick = (e) => {
         if (e.target === modal) modal.remove();
     };
@@ -229,14 +217,11 @@ function showSyncModal() {
 
 function copyCode() {
     const code = getSyncCode();
-    
-    // Copiar al portapapeles
     if (navigator.clipboard) {
         navigator.clipboard.writeText(code).then(() => {
             showToast('✅ Código copiado al portapapeles');
         });
     } else {
-        // Fallback para navegadores antiguos
         const input = document.createElement('input');
         input.value = code;
         document.body.appendChild(input);
@@ -257,14 +242,11 @@ async function restoreFromCode() {
     }
     
     showToast('🔄 Restaurando progreso...');
-    
     const success = await syncFromCloud(code);
     
     if (success) {
         showToast('✅ Progreso restaurado correctamente');
         document.getElementById('sync-modal').remove();
-        
-        // Recargar la galería
         if (typeof renderGallery === 'function') {
             renderGallery();
         }
@@ -274,7 +256,6 @@ async function restoreFromCode() {
 }
 
 function showToast(message) {
-    // Remover toast anterior si existe
     const oldToast = document.getElementById('sync-toast');
     if (oldToast) oldToast.remove();
     
@@ -284,10 +265,7 @@ function showToast(message) {
     toast.textContent = message;
     document.body.appendChild(toast);
     
-    // Mostrar
     setTimeout(() => toast.classList.add('show'), 10);
-    
-    // Ocultar y remover
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -310,7 +288,6 @@ const Sync = {
     stopAutoSync
 };
 
-// Inicializar cuando el DOM esté listo
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         Sync.init().then(success => {
@@ -327,5 +304,4 @@ if (document.readyState === 'loading') {
     });
 }
 
-// Exportar para uso global
 window.Sync = Sync;
