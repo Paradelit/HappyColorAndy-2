@@ -414,6 +414,11 @@ const Game = {
     },
 
     loadLevel: function(index) {
+        if (this.worker) {
+            this.worker.terminate();
+            this.worker = null;
+        }
+
         this.startWorker();
 
         const level = niveles[index];
@@ -500,6 +505,9 @@ const Game = {
         }
 
         this.ui.canvas.classList.remove('framed-art');
+
+        this.hCtx.clearRect(0, 0, w, h);
+        this.lCtx.clearRect(0, 0, w, h);
 
         this.lineDrawCtx.drawImage(this.assets.imgLineas, 0, 0);
         this.hCtx.drawImage(this.assets.imgSolucion, 0, 0);
