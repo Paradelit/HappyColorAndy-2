@@ -4,8 +4,8 @@
 
 const niveles = [
     {
-        id: 'foto1',
-        nombre: 'Recuerdo 1',
+        id: 'foto2',
+        nombre: 'Recuerdo 2',
         nombreCompleto: "Pandy's Grad",
         lineas: 'lineas1.png',
         solucion: 'solucion1.png',
@@ -23,8 +23,8 @@ const niveles = [
         ]
     },
     {
-        id: 'foto2',
-        nombre: 'Recuerdo 2',
+        id: 'foto3',
+        nombre: 'Recuerdo 4',
         nombreCompleto: 'Stardew Lavander',
         lineas: 'lineas2.png',
         solucion: 'solucion2.png',
@@ -42,9 +42,9 @@ const niveles = [
         ]
     },
     {
-        id: 'foto3', 
-        nombre: 'Nuevo Recuerdo', 
-        nombreCompleto: 'Nuevo Recuerdo', 
+        id: 'foto1', 
+        nombre: 'Recuerdo 1', 
+        nombreCompleto: 'Florandy', 
         lineas: 'lineas3.png', 
         solucion: 'solucion3.png',
         colores: [
