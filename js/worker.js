@@ -1,5 +1,5 @@
 // ==========================================
-// 💷 WORKER.JS (OPTIMIZADO - PINTADO FLUIDO)
+// 💷 WORKER.JS (OPTIMIZADO - CON PRE-PROCESAMIENTO)
 // ==========================================
 
 let cache = {
@@ -23,6 +23,75 @@ self.onmessage = function(e) {
         cache.visited = new Uint8Array(width * height);
     }
 
+    // NUEVO: Pre-procesar imagen completa
+    if (type === 'PREPROCESS') {
+        const { width, height, solBuffer, linBuffer, colorsRGB } = e.data;
+        
+        const sol = new Uint8ClampedArray(solBuffer);
+        const linData = new Uint8ClampedArray(linBuffer);
+        const wallMap = new Uint8Array(width * height);
+        const pixelMap = Array.from({length: colorsRGB.length}, () => []);
+        const pixelsRemaining = new Array(colorsRGB.length).fill(0);
+        
+        const totalPixels = width * height;
+        let processedPixels = 0;
+        const reportInterval = Math.floor(totalPixels / 20); // Reportar progreso 20 veces
+        
+        for(let i = 0; i < totalPixels; i++) {
+            const idx = i * 4;
+            
+            // Detectar paredes (líneas negras)
+            if(linData[idx] < 150 && linData[idx+1] < 150 && 
+               linData[idx+2] < 150 && linData[idx+3] > 200) {
+                wallMap[i] = 1;
+            } else {
+                wallMap[i] = 0;
+                
+                // Solo procesar píxeles con alpha > 0
+                if(sol[idx+3] > 0) {
+                    const r = sol[idx], g = sol[idx+1], b = sol[idx+2];
+                    let best = -1, minD = 999;
+                    
+                    // Encontrar el color más cercano
+                    for(let c = 0; c < colorsRGB.length; c++) {
+                        const d = Math.abs(r - colorsRGB[c].r) + 
+                                  Math.abs(g - colorsRGB[c].g) + 
+                                  Math.abs(b - colorsRGB[c].b);
+                        if(d < minD) { 
+                            minD = d; 
+                            best = c; 
+                        }
+                    }
+                    
+                    if(best !== -1 && minD < 15) { 
+                        pixelMap[best].push(i);
+                        pixelsRemaining[best]++;
+                    }
+                }
+            }
+            
+            // Reportar progreso
+            processedPixels++;
+            if (processedPixels % reportInterval === 0) {
+                const progress = Math.floor((processedPixels / totalPixels) * 100);
+                self.postMessage({ 
+                    type: 'PREPROCESS_PROGRESS', 
+                    progress 
+                });
+            }
+        }
+        
+        // Convertir pixelMap a TypedArrays para transferir eficientemente
+        const pixelMapSerialized = pixelMap.map(arr => new Int32Array(arr));
+        
+        self.postMessage({ 
+            type: 'PREPROCESS_COMPLETE',
+            wallBuffer: wallMap.buffer,
+            pixelMap: pixelMapSerialized,
+            pixelsRemaining
+        }, [wallMap.buffer, ...pixelMapSerialized.map(arr => arr.buffer)]);
+    }
+
     if (type === 'FILL') {
         const { sx, sy, color, currentBuffer } = e.data;
         const currentData = new Uint8ClampedArray(currentBuffer);
@@ -44,7 +113,6 @@ self.onmessage = function(e) {
             const idx = candidateIndices[i]; 
             const pIdx = idx * 4;
 
-            // Buscar un pixel que NO esté pintado (alpha bajo O color diferente)
             if (currentPixels[pIdx+3] < 200 || !colorsMatch(
                 currentPixels[pIdx], currentPixels[pIdx+1], currentPixels[pIdx+2], 
                 color.r, color.g, color.b
@@ -84,10 +152,8 @@ function getFloodFillIndices(sx, sy, col, currentData) {
     
     const startIdx = sy * w + sx;
     
-    // Verificar si es una pared
     if (walls[startIdx] === 1) return new Int32Array(0);
     
-    // Verificar si el pixel inicial coincide con el color objetivo
     const iStart = startIdx * 4;
     if (!colorsMatch(sol[iStart], sol[iStart+1], sol[iStart+2], targetR, targetG, targetB)) {
         return new Int32Array(0);
@@ -97,9 +163,7 @@ function getFloodFillIndices(sx, sy, col, currentData) {
     q[qEnd++] = sx; 
     q[qEnd++] = sy;
     
-    // CORRECCIÓN IMPORTANTE: Solo agregar a resultIndices si NO está pintado
     const pStart = startIdx * 4;
-    // Verificar que alpha sea bajo (< 200) O que el color no coincida
     if (currentData[pStart+3] < 200 || !colorsMatch(currentData[pStart], currentData[pStart+1], currentData[pStart+2], targetR, targetG, targetB)) {
         resultIndices.push(startIdx);
     }
@@ -117,24 +181,19 @@ function getFloodFillIndices(sx, sy, col, currentData) {
             nx = cx + DX[i];
             ny = cy + DY[i];
 
-            // Chequeo de límites
             if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
             
             nIdx = ny * w + nx;
             
-            // Si ya fue visitado o es una pared, saltar
             if (cache.visited[nIdx] === 1 || walls[nIdx] === 1) continue;
             
             nPx = nIdx * 4;
             
-            // Verificar si el pixel en la solución coincide con el color objetivo
             if (colorsMatch(sol[nPx], sol[nPx+1], sol[nPx+2], targetR, targetG, targetB)) {
                 cache.visited[nIdx] = 1;
                 q[qEnd++] = nx; 
                 q[qEnd++] = ny;
                 
-                // CORRECCIÓN CRÍTICA: Solo agregar si NO está ya pintado correctamente
-                // Verificar alpha bajo O color diferente
                 if (currentData[nPx+3] < 200 || !colorsMatch(currentData[nPx], currentData[nPx+1], currentData[nPx+2], targetR, targetG, targetB)) {
                     resultIndices.push(nIdx);
                 }
