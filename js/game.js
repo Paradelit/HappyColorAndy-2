@@ -77,7 +77,7 @@ const Game = {
             cBtnCancel: document.getElementById('c-btn-cancel')
         };
 
-        this.ctx = this.ui.canvas.getContext('2d', { willReadFrequently: false, desynchronized: true });
+        this.ctx = this.ui.canvas.getContext('2d', { willReadFrequently: true, desynchronized: false });
         this.hlCtx = this.ui.hlCanvas.getContext('2d', { willReadFrequently: false }); 
         this.lineDrawCtx = this.ui.linesCanvas.getContext('2d', { willReadFrequently: false }); 
         
