@@ -551,17 +551,19 @@ const Game = {
         this.lineDrawCtx.clearRect(0, 0, this.ui.canvas.width, this.ui.canvas.height);
 
         const globalCache = window.imageCache || {};
+        
         if (globalCache[level.lineas]?.complete) {
             this.assets.imgLineas = globalCache[level.lineas];
             this.state.loadedCount++;
         } else {
-            this.assets.imgLineas.src = level.lineas + '?' + Date.now();
+            this.assets.imgLineas.src = level.lineas; // Sin parámetros extra
         }
+        
         if (globalCache[level.solucion]?.complete) {
             this.assets.imgSolucion = globalCache[level.solucion];
             this.state.loadedCount++;
         } else {
-            this.assets.imgSolucion.src = level.solucion + '?' + Date.now();
+            this.assets.imgSolucion.src = level.solucion; // Sin parámetros extra
         }
         
         if (this.state.loadedCount === 2) setTimeout(() => this.startGame(), 50);
@@ -604,8 +606,9 @@ const Game = {
             return; 
         }
 
+        // Limpieza y preparación para el Worker
         this.ui.canvas.classList.remove('framed-art');
-
+        this.ctx.clearRect(0, 0, w, h);
         this.hCtx.clearRect(0, 0, w, h);
         this.lCtx.clearRect(0, 0, w, h);
 
@@ -613,77 +616,82 @@ const Game = {
         this.hCtx.drawImage(this.assets.imgSolucion, 0, 0);
         this.lCtx.drawImage(this.assets.imgLineas, 0, 0);
         
-        // IMPORTANTE: Inicializar canvas en transparente (alpha = 0)
-        // Esto evita problemas con colores como el blanco que coincidirÃ­an con un fondo blanco
-        this.ctx.clearRect(0, 0, w, h);
-
-        this.cache.solData = this.hCtx.getImageData(0, 0, w, h).data;
+        // Obtener datos para enviar al worker
+        const solData = this.hCtx.getImageData(0, 0, w, h).data;
         const linData = this.lCtx.getImageData(0, 0, w, h).data;
-        this.cache.wallMap = new Uint8Array(w * h);
         
-        const numColors = this.state.coloresRGB.length;
-        this.state.pixelMap = Array.from({length: numColors}, () => []);
-        this.state.pixelsRemaining = new Array(numColors).fill(0);
-        const sol = this.cache.solData;
-        const cols = this.state.coloresRGB;
-
+        // Generar mapa de paredes rápido en hilo principal
+        const wallMap = new Uint8Array(w * h);
         for(let i=0; i<w*h; i++) {
             const idx = i*4;
             if(linData[idx] < 150 && linData[idx+1] < 150 && linData[idx+2] < 150 && linData[idx+3] > 200) {
-                this.cache.wallMap[i] = 1;
-            } else {
-                this.cache.wallMap[i] = 0;
-                if(sol[idx+3] > 0) {
-                    const r=sol[idx], g=sol[idx+1], b=sol[idx+2];
-                    let best = -1, minD = 999;
-                    for(let c=0; c<cols.length; c++) {
-                        const d = Math.abs(r - cols[c].r) + Math.abs(g - cols[c].g) + Math.abs(b - cols[c].b);
-                        if(d < minD) { minD = d; best = c; }
-                    }
-                    if(best !== -1 && minD < 15) { 
-                        this.state.pixelMap[best].push(i);
-                        this.state.pixelsRemaining[best]++;
-                    }
-                }
+                wallMap[i] = 1;
             }
         }
 
-        this.state.initialPixels = [...this.state.pixelsRemaining];
+        // Buffers transferibles
+        const solBuffer = solData.buffer.slice(0);
+        const wallBuffer = wallMap.buffer.slice(0);
 
-        const wallBuffer = this.cache.wallMap.buffer.slice(0);
-        const solBuffer = this.cache.solData.buffer.slice(0);
+        // --- CAMBIO CLAVE: DELEGAR EL BUCLE PESADO AL WORKER ---
+        this.worker.onmessage = (e) => {
+            if (e.data.type === 'ANALYSIS_COMPLETE') {
+                // Recuperar datos procesados
+                this.state.pixelMap = e.data.pixelMap;
+                this.state.pixelsRemaining = e.data.pixelsRemaining;
+                this.state.initialPixels = [...this.state.pixelsRemaining];
+                
+                // Guardar buffers en cache del worker
+                this.cache.solData = new Uint8ClampedArray(solBuffer);
+                this.cache.wallMap = wallMap;
+
+                // Restaurar listener normal y terminar carga
+                this.worker.onmessage = (ev) => this.handleWorkerMessage(ev);
+                this.finishLoadingLevel(levelId);
+            } else {
+                this.handleWorkerMessage(e);
+            }
+        };
+
         this.worker.postMessage({
-            type: 'INIT', width: w, height: h, wallBuffer, solBuffer
-        }, [wallBuffer, solBuffer]);
+            type: 'ANALYZE_AND_INIT', 
+            width: w, 
+            height: h, 
+            solBuffer: solBuffer, 
+            wallBuffer: wallBuffer,
+            coloresRGB: this.state.coloresRGB
+        }, [solBuffer, wallBuffer]);
+    },
 
+    finishLoadingLevel: async function(levelId) {
         const savedData = await loadFromDB(levelId);
+        
         if(savedData) {
             const img = new Image();
             img.onload = () => { 
                 this.ctx.drawImage(img, 0, 0);
                 this.restoreLinesErasure(); 
                 this.recalculateRemainingPixels(); 
-                this.generarPaletaUI(); 
-                this.selectColor(0); 
-                this.queueProgressUpdate();
-                this.ui.loading.classList.add('hidden');
-                this.resetIdleTimer();
+                this.finalizeStart();
             };
             img.src = savedData;
         } else { 
-            this.generarPaletaUI();
-            this.selectColor(0);
-            this.queueProgressUpdate();
-            this.ui.loading.classList.add('hidden');
-            this.resetIdleTimer();
+            this.finalizeStart();
         }
+    },
 
-        this.fitCamera(w, h);
-
-        if (Tutorial.init()) {
-            setTimeout(() => {
-                Tutorial.show();
-            }, 1500);
+    finalizeStart: function() {
+        this.generarPaletaUI();
+        this.selectColor(0);
+        this.queueProgressUpdate();
+        this.fitCamera(this.ui.canvas.width, this.ui.canvas.height);
+        
+        // Aquí es donde finalmente quitamos la pantalla de carga
+        this.ui.loading.classList.add('hidden'); 
+        this.resetIdleTimer();
+        
+        if (typeof Tutorial !== 'undefined' && Tutorial.init()) {
+            setTimeout(() => Tutorial.show(), 1500);
         }
     },
 

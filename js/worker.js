@@ -14,13 +14,57 @@ const TOLERANCE_THRESHOLD = 15;
 self.onmessage = function(e) {
     const { type } = e.data;
 
-    if (type === 'INIT') {
-        const { width, height, solBuffer, wallBuffer } = e.data;
+    if (type === 'ANALYZE_AND_INIT') {
+        const { width, height, solBuffer, wallBuffer, coloresRGB } = e.data;
+        
         cache.w = width;
         cache.h = height;
         cache.solData = new Uint8ClampedArray(solBuffer);
-        cache.wallMap = new Uint8Array(wallBuffer);
+        cache.wallMap = new Uint8Array(wallBuffer); // Se llenará aquí
         cache.visited = new Uint8Array(width * height);
+        
+        const sol = cache.solData;
+        const walls = cache.wallMap; // Viene vacío o con datos de líneas
+        
+        // Estructuras para devolver al hilo principal
+        const pixelMap = Array.from({length: coloresRGB.length}, () => []);
+        const pixelsRemaining = new Int32Array(coloresRGB.length).fill(0);
+        
+        // ANÁLISIS INTENSIVO (Ahora ocurre en segundo plano)
+        for(let i = 0; i < width * height; i++) {
+            const idx = i * 4;
+            
+            // Si en el buffer de paredes (líneas) hay oscuridad, es pared
+            // Nota: Asumimos que wallBuffer viene con datos del canal Alpha o luminosidad
+            if (walls[i] === 1) {
+                // Ya marcado como pared externamente o lo dejamos así
+                continue;
+            }
+
+            // Si es transparente en la solución, no es jugable
+            if (sol[idx+3] === 0) continue;
+
+            const r = sol[idx], g = sol[idx+1], b = sol[idx+2];
+            let best = -1, minD = 999;
+
+            // Buscar el color más cercano
+            for(let c = 0; c < coloresRGB.length; c++) {
+                const col = coloresRGB[c];
+                const d = Math.abs(r - col.r) + Math.abs(g - col.g) + Math.abs(b - col.b);
+                if(d < minD) { minD = d; best = c; }
+            }
+
+            if(best !== -1 && minD < 15) {
+                pixelMap[best].push(i);
+                pixelsRemaining[best]++;
+            }
+        }
+
+        self.postMessage({ 
+            type: 'ANALYSIS_COMPLETE', 
+            pixelMap: pixelMap,
+            pixelsRemaining: pixelsRemaining 
+        });
     }
 
     if (type === 'FILL') {

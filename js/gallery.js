@@ -148,6 +148,21 @@ async function renderGallery() {
             }
         });
     });
+
+    const nextLevelIdx = getFirstUncompletedLevel();
+    if (niveles[nextLevelIdx]) {
+        const nextLevel = niveles[nextLevelIdx];
+        
+        // Precargar líneas
+        const imgL = new Image();
+        imgL.src = nextLevel.lineas;
+        window.imageCache[nextLevel.lineas] = imgL;
+        
+        // Precargar solución
+        const imgS = new Image();
+        imgS.src = nextLevel.solucion;
+        window.imageCache[nextLevel.solucion] = imgS;
+    }
 }
 
 // ==========================================
