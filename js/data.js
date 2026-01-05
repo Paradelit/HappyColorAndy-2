@@ -4,8 +4,27 @@
 
 const niveles = [
     {
-        id: 'foto1', 
-        nombre: 'Recuerdo 1', 
+        id: 'foto1',
+        nombre: 'Recuerdo 1',
+        nombreCompleto: 'Alteandy', // Puedes cambiar este nombre por el título real
+        lineas: 'lineas5.png',
+        solucion: 'solucion5.png',
+        colores: [
+            '#352a2a', '#1a0f0f', '#4f4140', '#302423', '#554b4a', '#5f5250', '#2b1e1c', '#241816', '#645957', '#753b2d',
+            '#642c1e', '#8b432f', '#c0806e', '#bfb1ad', '#c79d91', '#372621', '#afa5a2', '#9c563f', '#40312c', '#3d2b25',
+            '#c3907f', '#af6349', '#bd6f54', '#75615a', '#6d5c56', '#4a2a1e', '#56392e', '#4a352d', '#7b665e', '#c7bdb9',
+            '#95847d', '#c07a5c', '#a69892', '#65493d', '#83736c', '#5d4236', '#7e6c64', '#a0705a', '#734d3b', '#6b5449',
+            '#8c6552', '#7c5947', '#c48666', '#917566', '#a87f69', '#c49880', '#cda38c', '#c79070', '#b98b70', '#c99f86',
+            '#c2a99a', '#cc9877', '#ccaa94', '#aa8d7a', '#cfa081', '#cda78d', '#4e3e32', '#d3b6a0', '#cfaf96', '#42473a',
+            '#607a8a', '#006ab2', '#257cba', '#537085', '#537fa0', '#6a96b7', '#426c8c', '#438cc5', '#426582', '#427198',
+            '#245a87', '#34658f', '#005cac', '#40576e', '#004da0', '#27374c', '#1d2531', '#a9aeba', '#adb1bc', '#bec0c7',
+            '#b2b5c0', '#b6b8c1', '#9ea1af', '#818492', '#b9bbc5', '#a5a8b7', '#989aa9', '#abacb4', '#9394a3', '#8b8b9a',
+            '#c5c5cb', '#5d5c61', '#7e7a80', '#776f75', '#3f3b3e', '#bcb8bb', '#6e6567', '#b0656b', '#c08488', '#944d50'
+        ]
+    },
+    {
+        id: 'foto2', 
+        nombre: 'Recuerdo 2', 
         nombreCompleto: 'Florandy', 
         lineas: 'lineas3.png', 
         solucion: 'solucion3.png',
@@ -23,8 +42,8 @@ const niveles = [
         ]
     },
     {
-        id: 'foto2',
-        nombre: 'Recuerdo 2',
+        id: 'foto3',
+        nombre: 'Recuerdo 3',
         nombreCompleto: "Pandy's Grad",
         lineas: 'lineas1.png',
         solucion: 'solucion1.png',
@@ -42,8 +61,8 @@ const niveles = [
         ]
     },
     {
-        id: 'foto3',
-        nombre: 'Recuerdo 3',
+        id: 'foto4',
+        nombre: 'Recuerdo 4',
         nombreCompleto: 'Stardew Lavander',
         lineas: 'lineas2.png',
         solucion: 'solucion2.png',
@@ -61,8 +80,8 @@ const niveles = [
         ]
     },
     {
-        id: 'foto4',
-        nombre: 'Recuerdo 4', 
+        id: 'foto5',
+        nombre: 'Recuerdo 5', 
         nombreCompleto: 'X-Mas :)',
         lineas: 'lineas4.png',
         solucion: 'solucion4.png',
