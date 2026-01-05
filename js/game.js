@@ -62,7 +62,7 @@ const Game = {
             
             victoryModal: document.getElementById('victory-modal'),
             victoryTitle: document.getElementById('victory-title'),
-            victoryCanvas: document.getElementById('victory-canvas'),
+            victoryImg: document.getElementById('victory-img'), 
             btnCloseVictory: document.getElementById('btn-close-victory'),
 
             confirmModal: document.getElementById('confirm-modal'),
@@ -523,7 +523,10 @@ const Game = {
 
         const level = niveles[index];
         this.state.currentLevel = level;
-        this.ui.title.innerText = level.nombre;
+        const isDone = localStorage.getItem('completed_' + level.id) === 'true';
+        this.ui.title.innerText = isDone ? level.nombreCompleto : level.nombre;
+
+        this.cache.lastHighlightIndex = -1; 
         
         this.state.coloresRGB = level.colores.map(hex => ({
             r: parseInt(hex.slice(1, 3), 16),
@@ -544,6 +547,7 @@ const Game = {
         
         this.ui.canvas.classList.remove('framed-art');
         this.ui.linesCanvas.style.opacity = '1'; 
+        this.ui.hlCanvas.style.opacity = '1';
         
         this.state.loadedCount = 0;
         this.ctx.clearRect(0, 0, this.ui.canvas.width, this.ui.canvas.height);
@@ -976,79 +980,63 @@ const Game = {
         if (this.cache.idleTimer) clearTimeout(this.cache.idleTimer);
         this.ui.hlCanvas.classList.remove('smart-pulse');
         this.state.isVictoryShown = true;
+        
+        // Actualizar título en tiempo real al nombre completo
+        this.ui.title.innerText = this.state.currentLevel.nombreCompleto;
+        
         localStorage.setItem('completed_' + this.state.currentLevel.id, 'true');
         
-        // 1. FADE OUT de highlight y lÃ­neas (suave y lento)
+        // 1. FADE OUT de guías
         this.ui.hlCanvas.style.transition = 'opacity 1s ease';
         this.ui.linesCanvas.style.transition = 'opacity 1.5s ease';
         this.ui.hlCanvas.style.opacity = '0';
         this.ui.linesCanvas.style.opacity = '0';
         
-        // 2. Sonido de victoria
+        // 2. Sonido
         if(typeof updateSoundState === 'function') updateSoundState(false);
         if(typeof playEffect === 'function') playEffect(sVictory);
         
-        // 3. DespuÃ©s de 300ms, hacer ZOOM OUT suave para ver la imagen completa
+        // 3. ZOOM OUT SUAVE
         setTimeout(() => {
             const w = this.ui.canvas.width;
             const h = this.ui.canvas.height;
             const vW = this.ui.viewport.clientWidth;
             const vH = this.ui.viewport.clientHeight;
             
-            // Calcular escala para que se vea completa con un margen de 40px
             const targetScale = Math.min((vW - 80) / w, (vH - 80) / h);
             const targetX = (vW - w * targetScale) / 2;
             const targetY = (vH - h * targetScale) / 2;
             
-            // Animar el zoom out suavemente
             this.ui.zoomLayer.style.transition = 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
             this.state.scale = targetScale;
             this.state.pX = targetX;
             this.state.pY = targetY;
             this.updateTransform();
             
-            // 4. Agregar el marco dorado despuÃ©s del zoom
+            // 4. CAMBIO: Añadir el marco SOLO cuando el zoom termine (1500ms)
+            // Esto evita el parpadeo por repintado excesivo en móviles
             setTimeout(() => {
                 this.ui.canvas.classList.add('framed-art');
-            }, 800);
+            }, 1550); 
+            
         }, 300);
         
-        // 5. Primera rÃ¡faga de confetti
+        // 5. Confetti (igual que antes)
         setTimeout(() => {
-            confetti({ 
-                particleCount: 100, 
-                spread: 70, 
-                origin: { y: 0.6 },
-                colors: ['#d63384', '#667eea', '#764ba2', '#f093fb', '#4facfe']
-            });
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#d63384', '#667eea', '#764ba2', '#f093fb', '#4facfe'] });
         }, 500);
         
-        // 6. Segunda rÃ¡faga de confetti
         setTimeout(() => {
-            confetti({ 
-                particleCount: 80, 
-                spread: 100, 
-                origin: { y: 0.7 },
-                colors: ['#FFD700', '#FFA500', '#FF69B4', '#00CED1']
-            });
+            confetti({ particleCount: 80, spread: 100, origin: { y: 0.7 }, colors: ['#FFD700', '#FFA500', '#FF69B4', '#00CED1'] });
         }, 900);
         
-        // 7. Tercera rÃ¡faga mÃ¡s grande
-        setTimeout(() => {
-            confetti({ 
-                particleCount: 120, 
-                spread: 90, 
-                origin: { y: 0.5 },
-                colors: ['#d63384', '#667eea', '#FFD700', '#4facfe', '#FF69B4']
-            });
-        }, 1400);
-        
-        // 8. Mostrar el modal despuÃ©s de toda la animaciÃ³n
+        // 6. Mostrar MODAL (Corregido con IMG)
         setTimeout(() => {
             this.ui.victoryTitle.innerText = this.state.currentLevel.nombreCompleto;
-            this.ui.victoryCanvas.width = this.assets.imgSolucion.width;
-            this.ui.victoryCanvas.height = this.assets.imgSolucion.height;
-            this.ui.victoryCanvas.getContext('2d').drawImage(this.assets.imgSolucion, 0, 0);
+            
+            // CAMBIO: Usar src de imagen directamente
+            this.ui.victoryImg.src = this.assets.imgSolucion.src;
+            
             this.ui.victoryModal.classList.remove('hidden');
         }, 2500);
     },

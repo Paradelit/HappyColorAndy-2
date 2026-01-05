@@ -70,13 +70,13 @@ async function renderGallery() {
         
         const isUnlocked = isLevelUnlocked(i);
         const isDone = localStorage.getItem('completed_' + nivel.id) === 'true';
+
+        const displayName = isDone ? nivel.nombreCompleto : nivel.nombre;        
         
         if (isDone) completedCount++;
         if (isUnlocked) unlockedCount++;
 
-        // Diferentes estilos según el estado
         if (!isUnlocked) {
-            // NIVEL BLOQUEADO
             el.className = 'gallery-item locked';
             el.innerHTML = `
                 <div class="thumb-wrapper locked-wrapper" style="background: #e0e0e0; height: 160px; display:flex; flex-direction: column; align-items:center; justify-content:center; position: relative;">
@@ -86,16 +86,14 @@ async function renderGallery() {
                         <div class="unlock-hint">Completa "${niveles[i-1].nombre}"</div>
                     </div>
                 </div>
-                <div class="thumb-title" style="color: #999;">${nivel.nombre}</div>
+                <div class="thumb-title" style="color: #999;">${displayName}</div>
             `;
             
-            // Click en nivel bloqueado muestra mensaje
             el.onclick = () => {
                 showLockedMessage(i);
             };
             
         } else {
-            // NIVEL DESBLOQUEADO
             el.className = 'gallery-item unlocked';
             
             const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -104,12 +102,12 @@ async function renderGallery() {
                 <div class="thumb-wrapper" style="background: #f5f5f5; height: 160px; display:flex; align-items:center; justify-content:center; position: relative;">
                     <img data-src="" class="thumb-preview lazy-loading" 
                          src="${placeholder}" 
-                         alt="${nivel.nombre}"
+                         alt="${displayName}"
                          style="width:100%; height:100%; object-fit:contain; transition: opacity 0.3s; opacity: 0;"
                          onload="this.style.opacity=1">
                 </div>
                 ${isDone ? '<div class="check-badge">✓</div>' : '<div class="progress-badge">🎨</div>'}
-                <div class="thumb-title">${nivel.nombre}</div>
+                <div class="thumb-title">${displayName}</div>
             `;
             
             const imgEl = el.querySelector('.lazy-loading');
