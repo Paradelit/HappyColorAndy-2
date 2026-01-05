@@ -138,7 +138,7 @@ const Game = {
     // ==========================================
     // 🎨 PINTADO FLUIDO PROGRESIVO (NUEVO)
     // ==========================================
-    animateFillFluid: function(indices, color) {
+    animateFillFluid2: function(indices, color) {
         if (!indices || indices.length === 0) {
             this.state.isProcessing = false;
             return;
@@ -256,6 +256,111 @@ const Game = {
         
         requestAnimationFrame(loop);
     },
+
+    animateFillFluid: function(indices, color) {
+        if (!indices || indices.length === 0) {
+            this.state.isProcessing = false;
+            return;
+        }
+
+        const w = this.ui.canvas.width;
+        const h = this.ui.canvas.height;
+        
+        // 1. CALCULAR CAJA DELIMITADORA (Límites del área a pintar)
+        // Evita manipular toda la pantalla gigante si solo pintamos una zona
+        let minX = w, maxX = 0, minY = h, maxY = 0;
+        
+        for(let i = 0; i < indices.length; i++) {
+            const idx = indices[i];
+            const x = idx % w;
+            const y = (idx - x) / w; // Math.floor optimizado
+            if(x < minX) minX = x;
+            if(x > maxX) maxX = x;
+            if(y < minY) minY = y;
+            if(y > maxY) maxY = y;
+        }
+
+        // Añadir margen de seguridad de 2px
+        minX = Math.max(0, minX - 2);
+        minY = Math.max(0, minY - 2);
+        maxX = Math.min(w - 1, maxX + 2);
+        maxY = Math.min(h - 1, maxY + 2);
+
+        const rectW = maxX - minX + 1;
+        const rectH = maxY - minY + 1;
+
+        // 2. Trabajar SOLO con el trozo necesario
+        const imgData = this.ctx.getImageData(minX, minY, rectW, rectH);
+        const data = imgData.data;
+        const linesImgData = this.lineDrawCtx.getImageData(minX, minY, rectW, rectH);
+        const lData = linesImgData.data;
+
+        const r = color.r, g = color.g, b = color.b;
+
+        // Mapear índices globales a locales dentro de la caja
+        const localIndices = [];
+        const startIdx = indices[0];
+        const startX = startIdx % w; 
+        const startY = (startIdx - startX)/w;
+
+        for(let i = 0; i < indices.length; i++) {
+            const idx = indices[i];
+            const gx = idx % w;
+            const gy = (idx - gx) / w;
+            
+            // Distancia para efecto visual (aprox)
+            const dist = Math.abs(gx - startX) + Math.abs(gy - startY);
+            
+            // Índice local
+            const lx = gx - minX;
+            const ly = gy - minY;
+            localIndices.push({ 
+                lIdx: (ly * rectW + lx) * 4,
+                dist: dist
+            });
+        }
+        
+        // Ordenar para efecto de expansión
+        localIndices.sort((a, b) => a.dist - b.dist);
+
+        const total = localIndices.length;
+        // Ajustar velocidad: imágenes grandes necesitan ser más rápidas por frame
+        const duration = total < 1000 ? 200 : 400; 
+        
+        const startTime = performance.now();
+        let currentIndex = 0;
+
+        const loop = () => {
+            const elapsed = performance.now() - startTime;
+            let progress = elapsed / duration;
+            if(progress > 1) progress = 1;
+            
+            const targetIndex = Math.floor(progress * total);
+            
+            // Pintar lote
+            while (currentIndex < targetIndex) {
+                const p = localIndices[currentIndex];
+                const idx = p.lIdx;
+                
+                data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
+                lData[idx+3] = 0; // Borrar línea negra en esa zona
+                currentIndex++;
+            }
+
+            // Poner el trozo modificado en su sitio
+            this.ctx.putImageData(imgData, minX, minY);
+            this.lineDrawCtx.putImageData(linesImgData, minX, minY);
+
+            if (progress < 1) {
+                requestAnimationFrame(loop);
+            } else {
+                this.finishPaintOperation(total);
+            }
+        };
+        
+        requestAnimationFrame(loop);
+    },
+
 
     finishPaintOperation: function(paintedCount) {
         this.updateHighlightLayerOptimized(this.state.selectedColorIndex);
