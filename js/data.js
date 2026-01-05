@@ -6,9 +6,9 @@ const niveles = [
     {
         id: 'foto6',
         nombre: 'Recuerdo 6',
-        nombreCompleto: 'Prueba florandy', // ¡Edita esto con el nombre real!
-        lineas: 'lineas6.jpg',     
-        solucion: 'solucion6.jpg', 
+        nombreCompleto: 'Prueba florandy',
+        lineas: 'lineas6.png',     
+        solucion: 'solucion6.png', 
         colores: [
             '#321010', '#6a4b4a', '#491917', '#563634', '#efd1cf', '#442826', '#90706c', '#643e39', '#86645f', '#381d19',
             '#522b23', '#e0bbb3', '#7c564b', '#d2a699', '#bd9285', '#7c4a37', '#aa7b69', '#94604c', '#7d3a1d', '#c98057',
@@ -25,7 +25,7 @@ const niveles = [
     {
         id: 'foto1',
         nombre: 'Recuerdo 1',
-        nombreCompleto: 'Alteandy', // Puedes cambiar este nombre por el título real
+        nombreCompleto: 'Alteandy',
         lineas: 'lineas5.png',
         solucion: 'solucion5.png',
         colores: [
