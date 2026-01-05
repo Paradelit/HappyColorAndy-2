@@ -70,23 +70,52 @@ async function syncToCloud() {
     try {
         const code = getSyncCode();
         
+        // Límite de seguridad (Firestore permite 1MB = 1,048,576 bytes)
+        // Dejamos un margen de seguridad y usamos 950KB
+        const MAX_PAYLOAD_SIZE = 950000; 
+        
         const syncData = {
             completed: {},
             savedProgress: {},
             lastSync: Date.now()
         };
         
+        // Calculamos el peso inicial del JSON base (estimado)
+        let currentPayloadSize = JSON.stringify(syncData).length;
+        let skippedImages = 0;
+
+        // 1. PRIMERO: Guardar todos los "Completados" (ocupan muy poco espacio)
         niveles.forEach(nivel => {
             const isCompleted = localStorage.getItem('completed_' + nivel.id) === 'true';
             if (isCompleted) {
                 syncData.completed[nivel.id] = true;
+                // Sumamos un peso estimado de esta entrada
+                currentPayloadSize += 50; 
             }
         });
-        
+
+        // 2. SEGUNDO: Intentar guardar las imágenes en progreso hasta llenar la caja
         for (let nivel of niveles) {
-            const savedImg = await loadFromDB(nivel.id);
-            if (savedImg) {
-                syncData.savedProgress[nivel.id] = savedImg;
+            const isCompleted = localStorage.getItem('completed_' + nivel.id) === 'true';
+            
+            // Solo procesamos si NO está completado
+            if (!isCompleted) {
+                const savedImg = await loadFromDB(nivel.id);
+                
+                if (savedImg) {
+                    // Calculamos cuánto pesa esta imagen específica
+                    const imgSize = savedImg.length;
+                    
+                    // ¿Cabe en la caja?
+                    if ((currentPayloadSize + imgSize) < MAX_PAYLOAD_SIZE) {
+                        syncData.savedProgress[nivel.id] = savedImg;
+                        currentPayloadSize += imgSize;
+                    } else {
+                        // NO CABE: La saltamos para no romper la sincronización
+                        console.warn(`⚠️ Imagen de ${nivel.id} omitida por exceder límite de tamaño (${(imgSize/1024).toFixed(2)} KB)`);
+                        skippedImages++;
+                    }
+                }
             }
         }
         
@@ -95,7 +124,13 @@ async function syncToCloud() {
         // Guardar timestamp local
         localStorage.setItem('last_local_sync', syncData.lastSync.toString());
         
-        console.log('✅ Datos sincronizados con la nube');
+        if (skippedImages > 0) {
+            console.log(`✅ Sincronización parcial completada (se omitieron ${skippedImages} imágenes muy grandes)`);
+            // Opcional: Podrías mostrar un Toast aquí advirtiendo al usuario
+        } else {
+            console.log('✅ Datos sincronizados con la nube');
+        }
+        
         return true;
     } catch (error) {
         console.error('❌ Error al sincronizar:', error);
