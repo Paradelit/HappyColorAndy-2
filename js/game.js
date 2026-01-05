@@ -1,7 +1,3 @@
-// ==========================================
-// 🎮 LÓGICA DEL JUEGO (OPTIMIZADO - CARGA RÁPIDA)
-// ==========================================
-
 const sMagic = new Audio('magic.mp3'); sMagic.volume = 0.6;
 const sHint = new Audio('hint.mp3');   sHint.volume = 0.6;
 
@@ -21,7 +17,7 @@ const Game = {
         initialPixels: [],
         
         lastTransformUpdate: 0,
-        transformThrottle: 16
+        transformThrottle: 16 // ~60fps
     },
 
     input: { lX: 0, lY: 0, initDist: 0, lZoomT: 0 },
@@ -46,7 +42,6 @@ const Game = {
         this.ui = {
             screen: document.getElementById('game-screen'),
             loading: document.getElementById('loading-overlay'),
-            loadingText: document.querySelector('#loading-overlay'),
             title: document.querySelector('header h1'),
             progressBar: document.getElementById('progress-bar'),
             paleta: document.getElementById('paleta'),
@@ -133,40 +128,129 @@ const Game = {
                 
                 this.ui.hlCanvas.classList.add('smart-pulse');
             }
-        } else if (e.data.type === 'PREPROCESS_PROGRESS') {
-            // Actualizar indicador de progreso
-            this.ui.loadingText.innerHTML = `Procesando imagen...<br><span style="font-size:2rem;color:#d63384">${e.data.progress}%</span>`;
-        
-        } else if (e.data.type === 'PREPROCESS_COMPLETE') {
-            // Pre-procesamiento completado
-            console.log('✅ Pre-procesamiento completado');
-            const { wallBuffer, pixelMap, pixelsRemaining } = e.data;
-            
-            this.cache.wallMap = new Uint8Array(wallBuffer);
-            
-            // Convertir pixelMap de vuelta a arrays normales
-            this.state.pixelMap = pixelMap.map(typedArr => Array.from(typedArr));
-            this.state.pixelsRemaining = [...pixelsRemaining];
-            this.state.initialPixels = [...pixelsRemaining];
-            
-            // Guardar en caché para futuras cargas
-            this.saveProcessedDataToCache().then(() => {
-                console.log('💾 Caché guardada');
-            }).catch(err => {
-                console.warn('⚠️ Error guardando caché:', err);
-            });
-            
-            // Continuar con la carga del nivel (inmediatamente, no esperar al caché)
-            this.finishLevelLoad();
-            
-        } else if (e.data.type === 'PREPROCESS_ERROR') {
-            console.error('❌ Error en pre-procesamiento:', e.data.error);
-            this.ui.loadingText.innerHTML = 'Error al procesar imagen';
-            // Intentar cargar de forma tradicional como fallback
-            setTimeout(() => {
-                this.ui.loading.classList.add('hidden');
-            }, 1000);
         }
+    },
+
+    // ==========================================
+    // ðŸŽ¨ PINTADO FLUIDO PROGRESIVO (NUEVO)
+    // ==========================================
+    animateFillFluid2: function(indices, color) {
+        if (!indices || indices.length === 0) {
+            this.state.isProcessing = false;
+            return;
+        }
+
+        const w = this.ui.canvas.width;
+        const h = this.ui.canvas.height;
+        const total = indices.length;
+        
+        // Obtener las coordenadas del punto de inicio (primer Ã­ndice)
+        const startIdx = indices[0];
+        const startX = startIdx % w;
+        const startY = Math.floor(startIdx / w);
+        
+        // Ordenar pÃ­xeles por distancia euclidiana desde el punto de inicio
+        // Esto crea el efecto de "expansiÃ³n" desde el punto clickeado
+        const sortedIndices = Array.from(indices).sort((a, b) => {
+            const ax = a % w, ay = Math.floor(a / w);
+            const bx = b % w, by = Math.floor(b / w);
+            const distA = Math.sqrt((ax - startX) ** 2 + (ay - startY) ** 2);
+            const distB = Math.sqrt((bx - startX) ** 2 + (by - startY) ** 2);
+            return distA - distB;
+        });
+
+        // Preparar ImageData
+        const imgData = this.ctx.getImageData(0, 0, w, h);
+        const data = imgData.data;
+        const linesImgData = this.lineDrawCtx.getImageData(0, 0, w, h);
+        const lData = linesImgData.data;
+
+        const r = color.r, g = color.g, b = color.b;
+
+        // Detectar mÃ³vil
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        // NUEVA LÃ“GICA: Ajustar velocidad segÃºn tamaÃ±o del Ã¡rea
+        let duration; // DuraciÃ³n total en ms
+        let framesPerUpdate; // CuÃ¡ntos frames esperar entre cada actualizaciÃ³n visual
+        
+        if (total < 50) {
+            // Ãrea muy pequeÃ±a: casi instantÃ¡neo pero visible
+            duration = 80;
+            framesPerUpdate = 1;
+        } else if (total < 500) {
+            // Ãrea pequeÃ±a: rÃ¡pido
+            duration = 150;
+            framesPerUpdate = 1;
+        } else if (total < 2000) {
+            // Ãrea mediana: moderado
+            duration = 250;
+            framesPerUpdate = 1;
+        } else if (total < 5000) {
+            // Ãrea grande: mÃ¡s lento
+            duration = 400;
+            framesPerUpdate = isMobile ? 2 : 1;
+        } else if (total < 15000) {
+            // Ãrea muy grande: lento pero fluido
+            duration = 600;
+            framesPerUpdate = isMobile ? 3 : 2;
+        } else {
+            // Ãrea masiva: lo mÃ¡s fluido posible sin congelar
+            duration = 800;
+            framesPerUpdate = isMobile ? 4 : 3;
+        }
+
+        const startTime = performance.now();
+        let lastUpdate = 0;
+        let currentIndex = 0;
+        let frameCount = 0;
+
+        const loop = () => {
+            const elapsed = performance.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Calcular cuÃ¡ntos pÃ­xeles deberÃ­amos haber pintado hasta ahora
+            const targetIndex = Math.floor(progress * total);
+            
+            // Pintar los pÃ­xeles que faltan hasta el objetivo
+            while (currentIndex < targetIndex) {
+                const idx = sortedIndices[currentIndex] * 4;
+                data[idx] = r; 
+                data[idx+1] = g; 
+                data[idx+2] = b; 
+                data[idx+3] = 255;
+                lData[idx+3] = 0;
+                currentIndex++;
+            }
+
+            // Actualizar canvas segÃºn la frecuencia determinada
+            frameCount++;
+            if (frameCount >= framesPerUpdate || progress >= 1) {
+                this.ctx.putImageData(imgData, 0, 0);
+                this.lineDrawCtx.putImageData(linesImgData, 0, 0);
+                frameCount = 0;
+            }
+
+            if (progress < 1) {
+                requestAnimationFrame(loop);
+            } else {
+                // Asegurar que todo estÃ¡ pintado y renderizado
+                while (currentIndex < total) {
+                    const idx = sortedIndices[currentIndex] * 4;
+                    data[idx] = r; 
+                    data[idx+1] = g; 
+                    data[idx+2] = b; 
+                    data[idx+3] = 255;
+                    lData[idx+3] = 0;
+                    currentIndex++;
+                }
+                this.ctx.putImageData(imgData, 0, 0);
+                this.lineDrawCtx.putImageData(linesImgData, 0, 0);
+                this.finishPaintOperation(total);
+            }
+        };
+        
+        requestAnimationFrame(loop);
     },
 
     animateFillFluid: function(indices, color) {
@@ -178,18 +262,21 @@ const Game = {
         const w = this.ui.canvas.width;
         const h = this.ui.canvas.height;
         
+        // 1. CALCULAR CAJA DELIMITADORA (LÃ­mites del Ã¡rea a pintar)
+        // Evita manipular toda la pantalla gigante si solo pintamos una zona
         let minX = w, maxX = 0, minY = h, maxY = 0;
         
         for(let i = 0; i < indices.length; i++) {
             const idx = indices[i];
             const x = idx % w;
-            const y = (idx - x) / w;
+            const y = (idx - x) / w; // Math.floor optimizado
             if(x < minX) minX = x;
             if(x > maxX) maxX = x;
             if(y < minY) minY = y;
             if(y > maxY) maxY = y;
         }
 
+        // AÃ±adir margen de seguridad de 2px
         minX = Math.max(0, minX - 2);
         minY = Math.max(0, minY - 2);
         maxX = Math.min(w - 1, maxX + 2);
@@ -198,6 +285,7 @@ const Game = {
         const rectW = maxX - minX + 1;
         const rectH = maxY - minY + 1;
 
+        // 2. Trabajar SOLO con el trozo necesario
         const imgData = this.ctx.getImageData(minX, minY, rectW, rectH);
         const data = imgData.data;
         const linesImgData = this.lineDrawCtx.getImageData(minX, minY, rectW, rectH);
@@ -205,6 +293,7 @@ const Game = {
 
         const r = color.r, g = color.g, b = color.b;
 
+        // Mapear Ã­ndices globales a locales dentro de la caja
         const localIndices = [];
         const startIdx = indices[0];
         const startX = startIdx % w; 
@@ -215,7 +304,9 @@ const Game = {
             const gx = idx % w;
             const gy = (idx - gx) / w;
             
+            // Distancia para efecto visual (aprox)
             const dist = (gx - startX)**2 + (gy - startY)**2;          
+            // Ãndice local
             const lx = gx - minX;
             const ly = gy - minY;
             localIndices.push({ 
@@ -224,9 +315,11 @@ const Game = {
             });
         }
         
+        // Ordenar para efecto de expansiÃ³n
         localIndices.sort((a, b) => a.dist - b.dist);
 
         const total = localIndices.length;
+        // Ajustar velocidad: imÃ¡genes grandes necesitan ser mÃ¡s rÃ¡pidas por frame
         const duration = total < 1000 ? 200 : 400; 
         
         const startTime = performance.now();
@@ -239,15 +332,17 @@ const Game = {
             
             const targetIndex = Math.floor(progress * total);
             
+            // Pintar lote
             while (currentIndex < targetIndex) {
                 const p = localIndices[currentIndex];
                 const idx = p.lIdx;
                 
                 data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
-                lData[idx+3] = 0;
+                lData[idx+3] = 0; // Borrar lÃ­nea negra en esa zona
                 currentIndex++;
             }
 
+            // Poner el trozo modificado en su sitio
             this.ctx.putImageData(imgData, minX, minY);
             this.lineDrawCtx.putImageData(linesImgData, minX, minY);
 
@@ -260,6 +355,7 @@ const Game = {
         
         requestAnimationFrame(loop);
     },
+
 
     finishPaintOperation: function(paintedCount) {
         this.updateHighlightLayerOptimized(this.state.selectedColorIndex);
@@ -304,25 +400,25 @@ const Game = {
         this.ui.btnBack.onclick = () => this.exitGame(false);
 
         this.ui.btnHint.onclick = () => {
-            this.showConfirm('hint', '💡 Usar Pista', '¿Quieres que te indiquemos dónde pintar un píxel difícil?', () => {
+            this.showConfirm('hint', 'ðŸ’¡ Usar Pista', 'Â¿Quieres que te indiquemos dÃ³nde pintar un pÃ­xel difÃ­cil?', () => {
                 this.useHint(); this.resetIdleTimer();
             });
         };
 
         this.ui.btnMagic.onclick = () => {
-            this.showConfirm('magic', '✨ Varita Mágica', '¿Quieres completar automáticamente todo el color seleccionado?', () => {
+            this.showConfirm('magic', 'âœ¨ Varita MÃ¡gica', 'Â¿Quieres completar automÃ¡ticamente todo el color seleccionado?', () => {
                 this.useMagic(); this.resetIdleTimer();
             });
         };
 
         this.ui.btnReset.onclick = () => {
-            this.showConfirm('reset', '🗑️ Borrar Progreso', '¡Cuidado! Se borrará todo lo que has pintado en esta foto.', () => {
+            this.showConfirm('reset', 'ðŸ—‘ï¸ Borrar Progreso', 'Â¡Cuidado! Se borrarÃ¡ todo lo que has pintado en esta foto.', () => {
                 this.resetLevel();
             });
         };
 
         this.ui.btnDownload.onclick = () => {
-             this.showConfirm('download', '💾 Descargar', '¿Quieres guardar la imagen en tu dispositivo?', () => {
+             this.showConfirm('download', 'ðŸ’¾ Descargar', 'Â¿Quieres guardar la imagen en tu dispositivo?', () => {
                 this.downloadImage();
             });
         };
@@ -440,7 +536,6 @@ const Game = {
         document.getElementById('gallery-screen').classList.add('hidden');
         this.ui.screen.classList.remove('hidden');
         this.ui.loading.classList.remove('hidden');
-        this.ui.loadingText.innerHTML = 'Cargando imágenes...';
         
         this.state.isVictoryShown = false;
         this.ui.progressBar.style.width = '0%';
@@ -476,47 +571,6 @@ const Game = {
     checkLoad: function() {
         this.state.loadedCount++;
         if(this.state.loadedCount === 2) setTimeout(() => this.startGame(), 50);
-    },
-
-    getCacheKey: function() {
-        return 'processed_' + this.state.currentLevel.id;
-    },
-
-    async saveProcessedDataToCache() {
-        const cacheData = {
-            pixelMap: this.state.pixelMap,
-            pixelsRemaining: this.state.pixelsRemaining,
-            wallMap: Array.from(this.cache.wallMap),
-            version: 1
-        };
-        
-        try {
-            await saveToDB(this.getCacheKey(), JSON.stringify(cacheData));
-        } catch(e) {
-            console.warn('No se pudo guardar caché:', e);
-        }
-    },
-
-    async loadProcessedDataFromCache() {
-        try {
-            const cached = await loadFromDB(this.getCacheKey());
-            if (cached) {
-                console.log('🔍 Caché encontrada');
-                const cacheData = JSON.parse(cached);
-                if (cacheData.version === 1) {
-                    this.state.pixelMap = cacheData.pixelMap;
-                    this.state.pixelsRemaining = cacheData.pixelsRemaining;
-                    this.state.initialPixels = [...cacheData.pixelsRemaining];
-                    this.cache.wallMap = new Uint8Array(cacheData.wallMap);
-                    console.log('✅ Datos de caché cargados correctamente');
-                    return true;
-                }
-            }
-            console.log('ℹ️ No hay caché disponible');
-        } catch(e) {
-            console.warn('⚠️ Error cargando caché:', e);
-        }
-        return false;
     },
 
     startGame: async function() {
@@ -559,58 +613,51 @@ const Game = {
         this.hCtx.drawImage(this.assets.imgSolucion, 0, 0);
         this.lCtx.drawImage(this.assets.imgLineas, 0, 0);
         
+        // IMPORTANTE: Inicializar canvas en transparente (alpha = 0)
+        // Esto evita problemas con colores como el blanco que coincidirÃ­an con un fondo blanco
         this.ctx.clearRect(0, 0, w, h);
 
         this.cache.solData = this.hCtx.getImageData(0, 0, w, h).data;
+        const linData = this.lCtx.getImageData(0, 0, w, h).data;
+        this.cache.wallMap = new Uint8Array(w * h);
         
-        // INTENTAR CARGAR DESDE CACHÉ
-        this.ui.loadingText.innerHTML = 'Verificando caché...';
-        const cachedSuccess = await this.loadProcessedDataFromCache();
-        
-        if (cachedSuccess) {
-            // ¡Caché encontrada! Saltar procesamiento
-            console.log('⚡ Cargado desde caché');
-            this.ui.loadingText.innerHTML = '¡Cargado desde caché! ⚡';
-            // Pequeño delay para que se vea el mensaje
-            await new Promise(resolve => setTimeout(resolve, 300));
-            this.finishLevelLoad();
-        } else {
-            // No hay caché, procesar con worker
-            console.log('🔄 Procesando imagen por primera vez');
-            this.ui.loadingText.innerHTML = 'Procesando imagen...<br><span style="font-size:2rem;color:#d63384">0%</span>';
-            
-            const linData = this.lCtx.getImageData(0, 0, w, h).data;
-            const solBuffer = this.cache.solData.buffer.slice(0);
-            const linBuffer = linData.buffer.slice(0);
-            
-            this.worker.postMessage({
-                type: 'PREPROCESS',
-                width: w,
-                height: h,
-                solBuffer,
-                linBuffer,
-                coloresRGB: this.state.coloresRGB
-            }, [solBuffer, linBuffer]);
-        }
-    },
+        const numColors = this.state.coloresRGB.length;
+        this.state.pixelMap = Array.from({length: numColors}, () => []);
+        this.state.pixelsRemaining = new Array(numColors).fill(0);
+        const sol = this.cache.solData;
+        const cols = this.state.coloresRGB;
 
-    async finishLevelLoad() {
-        console.log('🎮 Finalizando carga del nivel');
-        const w = this.ui.canvas.width;
-        const h = this.ui.canvas.height;
-        const levelId = this.state.currentLevel.id;
-        
-        // Inicializar worker con datos procesados
+        for(let i=0; i<w*h; i++) {
+            const idx = i*4;
+            if(linData[idx] < 150 && linData[idx+1] < 150 && linData[idx+2] < 150 && linData[idx+3] > 200) {
+                this.cache.wallMap[i] = 1;
+            } else {
+                this.cache.wallMap[i] = 0;
+                if(sol[idx+3] > 0) {
+                    const r=sol[idx], g=sol[idx+1], b=sol[idx+2];
+                    let best = -1, minD = 999;
+                    for(let c=0; c<cols.length; c++) {
+                        const d = Math.abs(r - cols[c].r) + Math.abs(g - cols[c].g) + Math.abs(b - cols[c].b);
+                        if(d < minD) { minD = d; best = c; }
+                    }
+                    if(best !== -1 && minD < 15) { 
+                        this.state.pixelMap[best].push(i);
+                        this.state.pixelsRemaining[best]++;
+                    }
+                }
+            }
+        }
+
+        this.state.initialPixels = [...this.state.pixelsRemaining];
+
         const wallBuffer = this.cache.wallMap.buffer.slice(0);
         const solBuffer = this.cache.solData.buffer.slice(0);
         this.worker.postMessage({
             type: 'INIT', width: w, height: h, wallBuffer, solBuffer
         }, [wallBuffer, solBuffer]);
 
-        // Cargar progreso guardado o iniciar nuevo
         const savedData = await loadFromDB(levelId);
         if(savedData) {
-            console.log('📂 Cargando progreso guardado');
             const img = new Image();
             img.onload = () => { 
                 this.ctx.drawImage(img, 0, 0);
@@ -619,25 +666,14 @@ const Game = {
                 this.generarPaletaUI(); 
                 this.selectColor(0); 
                 this.queueProgressUpdate();
-                console.log('✅ Nivel cargado completamente');
-                this.ui.loading.classList.add('hidden');
-                this.resetIdleTimer();
-            };
-            img.onerror = () => {
-                console.error('❌ Error cargando imagen guardada');
-                this.generarPaletaUI();
-                this.selectColor(0);
-                this.queueProgressUpdate();
                 this.ui.loading.classList.add('hidden');
                 this.resetIdleTimer();
             };
             img.src = savedData;
         } else { 
-            console.log('🆕 Iniciando nivel nuevo');
             this.generarPaletaUI();
             this.selectColor(0);
             this.queueProgressUpdate();
-            console.log('✅ Nivel cargado completamente');
             this.ui.loading.classList.add('hidden');
             this.resetIdleTimer();
         }
@@ -685,6 +721,8 @@ const Game = {
             const c = this.state.coloresRGB[colorIdx];
             for(let pIdx of pixels) {
                 const idx = pIdx * 4;
+                // IMPORTANTE: Verificar que el pixel tenga alpha > 200 (estÃ¡ pintado)
+                // Y que coincida con el color. Esto evita contar pÃ­xeles transparentes como pintados
                 if(curData[idx+3] > 200 &&
                    Math.abs(curData[idx] - c.r) < 15 && 
                    Math.abs(curData[idx+1] - c.g) < 15 && 
@@ -928,35 +966,42 @@ const Game = {
         this.state.isVictoryShown = true;
         localStorage.setItem('completed_' + this.state.currentLevel.id, 'true');
         
+        // 1. FADE OUT de highlight y lÃ­neas (suave y lento)
         this.ui.hlCanvas.style.transition = 'opacity 1s ease';
         this.ui.linesCanvas.style.transition = 'opacity 1.5s ease';
         this.ui.hlCanvas.style.opacity = '0';
         this.ui.linesCanvas.style.opacity = '0';
         
+        // 2. Sonido de victoria
         if(typeof updateSoundState === 'function') updateSoundState(false);
         if(typeof playEffect === 'function') playEffect(sVictory);
         
+        // 3. DespuÃ©s de 300ms, hacer ZOOM OUT suave para ver la imagen completa
         setTimeout(() => {
             const w = this.ui.canvas.width;
             const h = this.ui.canvas.height;
             const vW = this.ui.viewport.clientWidth;
             const vH = this.ui.viewport.clientHeight;
             
+            // Calcular escala para que se vea completa con un margen de 40px
             const targetScale = Math.min((vW - 80) / w, (vH - 80) / h);
             const targetX = (vW - w * targetScale) / 2;
             const targetY = (vH - h * targetScale) / 2;
             
+            // Animar el zoom out suavemente
             this.ui.zoomLayer.style.transition = 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)';
             this.state.scale = targetScale;
             this.state.pX = targetX;
             this.state.pY = targetY;
             this.updateTransform();
             
+            // 4. Agregar el marco dorado despuÃ©s del zoom
             setTimeout(() => {
                 this.ui.canvas.classList.add('framed-art');
             }, 800);
         }, 300);
         
+        // 5. Primera rÃ¡faga de confetti
         setTimeout(() => {
             confetti({ 
                 particleCount: 100, 
@@ -966,6 +1011,7 @@ const Game = {
             });
         }, 500);
         
+        // 6. Segunda rÃ¡faga de confetti
         setTimeout(() => {
             confetti({ 
                 particleCount: 80, 
@@ -975,6 +1021,7 @@ const Game = {
             });
         }, 900);
         
+        // 7. Tercera rÃ¡faga mÃ¡s grande
         setTimeout(() => {
             confetti({ 
                 particleCount: 120, 
@@ -984,6 +1031,7 @@ const Game = {
             });
         }, 1400);
         
+        // 8. Mostrar el modal despuÃ©s de toda la animaciÃ³n
         setTimeout(() => {
             this.ui.victoryTitle.innerText = this.state.currentLevel.nombreCompleto;
             this.ui.victoryCanvas.width = this.assets.imgSolucion.width;
@@ -995,6 +1043,7 @@ const Game = {
 
     closeVictory: function() {
         this.ui.victoryModal.classList.add('hidden');
+        // Volver a la galerÃ­a despuÃ©s de cerrar la victoria
         this.exitGame(false);
     },
 
@@ -1020,6 +1069,7 @@ const Game = {
             history.back();
         }
 
+        // Resetear transiciones y opacidades
         this.ui.hlCanvas.classList.remove('smart-pulse');
         this.ui.hlCanvas.style.transition = '';
         this.ui.linesCanvas.style.transition = '';
@@ -1037,7 +1087,6 @@ const Game = {
 
     resetLevel: function() {
         deleteFromDB(this.state.currentLevel.id);
-        deleteFromDB(this.getCacheKey());
         localStorage.removeItem('completed_' + this.state.currentLevel.id);
         
         this.ui.canvas.classList.remove('framed-art');
@@ -1119,6 +1168,7 @@ const Game = {
         let count = 0;
         for(let pIdx of pixels) {
             const idx = pIdx * 4;
+            // Verificar si NO estÃ¡ pintado correctamente (alpha bajo O color diferente)
             if(dat[idx+3] < 200 || Math.abs(dat[idx] - c.r) > 15 || 
                Math.abs(dat[idx+1] - c.g) > 15 || Math.abs(dat[idx+2] - c.b) > 15) {
                 dat[idx] = c.r; dat[idx+1] = c.g; dat[idx+2] = c.b; dat[idx+3] = 255;
