@@ -606,7 +606,7 @@ const Game = {
             return; 
         }
 
-        // Limpieza y preparación para el Worker
+        // Limpieza y preparación
         this.ui.canvas.classList.remove('framed-art');
         this.ctx.clearRect(0, 0, w, h);
         this.hCtx.clearRect(0, 0, w, h);
@@ -616,11 +616,12 @@ const Game = {
         this.hCtx.drawImage(this.assets.imgSolucion, 0, 0);
         this.lCtx.drawImage(this.assets.imgLineas, 0, 0);
         
-        // Obtener datos para enviar al worker
+        // --- OBTENCIÓN DE DATOS ---
+        // solData es la vista original. NO la transferimos, transferiremos una copia.
         const solData = this.hCtx.getImageData(0, 0, w, h).data;
         const linData = this.lCtx.getImageData(0, 0, w, h).data;
         
-        // Generar mapa de paredes rápido en hilo principal
+        // Generar mapa de paredes
         const wallMap = new Uint8Array(w * h);
         for(let i=0; i<w*h; i++) {
             const idx = i*4;
@@ -629,11 +630,12 @@ const Game = {
             }
         }
 
-        // Buffers transferibles
+        // --- CREAR COPIAS PARA EL WORKER ---
+        // .slice(0) crea una copia nueva de la memoria.
         const solBuffer = solData.buffer.slice(0);
         const wallBuffer = wallMap.buffer.slice(0);
 
-        // --- CAMBIO CLAVE: DELEGAR EL BUCLE PESADO AL WORKER ---
+        // --- WORKER HANDLER ---
         this.worker.onmessage = (e) => {
             if (e.data.type === 'ANALYSIS_COMPLETE') {
                 // Recuperar datos procesados
@@ -641,8 +643,9 @@ const Game = {
                 this.state.pixelsRemaining = e.data.pixelsRemaining;
                 this.state.initialPixels = [...this.state.pixelsRemaining];
                 
-                // Guardar buffers en cache del worker
-                this.cache.solData = new Uint8ClampedArray(solBuffer);
+                // --- CORRECCIÓN AQUÍ ---
+                // Usamos 'solData' (la original) en lugar de 'solBuffer' (que ya se fue al worker)
+                this.cache.solData = solData; 
                 this.cache.wallMap = wallMap;
 
                 // Restaurar listener normal y terminar carga
@@ -653,6 +656,7 @@ const Game = {
             }
         };
 
+        // Enviar las COPIAS al worker (solBuffer y wallBuffer mueren aquí en el hilo principal)
         this.worker.postMessage({
             type: 'ANALYZE_AND_INIT', 
             width: w, 
