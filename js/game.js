@@ -309,8 +309,7 @@ const Game = {
             const gy = (idx - gx) / w;
             
             // Distancia para efecto visual (aprox)
-            const dist = Math.abs(gx - startX) + Math.abs(gy - startY);
-            
+            const dist = (gx - startX)**2 + (gy - startY)**2;          
             // Índice local
             const lx = gx - minX;
             const ly = gy - minY;
