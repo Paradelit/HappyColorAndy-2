@@ -25,71 +25,89 @@ self.onmessage = function(e) {
 
     // NUEVO: Pre-procesar imagen completa
     if (type === 'PREPROCESS') {
-        const { width, height, solBuffer, linBuffer, colorsRGB } = e.data;
-        
-        const sol = new Uint8ClampedArray(solBuffer);
-        const linData = new Uint8ClampedArray(linBuffer);
-        const wallMap = new Uint8Array(width * height);
-        const pixelMap = Array.from({length: colorsRGB.length}, () => []);
-        const pixelsRemaining = new Array(colorsRGB.length).fill(0);
-        
-        const totalPixels = width * height;
-        let processedPixels = 0;
-        const reportInterval = Math.floor(totalPixels / 20); // Reportar progreso 20 veces
-        
-        for(let i = 0; i < totalPixels; i++) {
-            const idx = i * 4;
+        try {
+            const { width, height, solBuffer, linBuffer, colorsRGB } = e.data;
             
-            // Detectar paredes (líneas negras)
-            if(linData[idx] < 150 && linData[idx+1] < 150 && 
-               linData[idx+2] < 150 && linData[idx+3] > 200) {
-                wallMap[i] = 1;
-            } else {
-                wallMap[i] = 0;
+            const sol = new Uint8ClampedArray(solBuffer);
+            const linData = new Uint8ClampedArray(linBuffer);
+            const wallMap = new Uint8Array(width * height);
+            const pixelMap = Array.from({length: colorsRGB.length}, () => []);
+            const pixelsRemaining = new Array(colorsRGB.length).fill(0);
+            
+            const totalPixels = width * height;
+            let processedPixels = 0;
+            const reportInterval = Math.max(1, Math.floor(totalPixels / 20)); // Reportar progreso 20 veces
+            let lastReportedProgress = 0;
+            
+            for(let i = 0; i < totalPixels; i++) {
+                const idx = i * 4;
                 
-                // Solo procesar píxeles con alpha > 0
-                if(sol[idx+3] > 0) {
-                    const r = sol[idx], g = sol[idx+1], b = sol[idx+2];
-                    let best = -1, minD = 999;
+                // Detectar paredes (líneas negras)
+                if(linData[idx] < 150 && linData[idx+1] < 150 && 
+                   linData[idx+2] < 150 && linData[idx+3] > 200) {
+                    wallMap[i] = 1;
+                } else {
+                    wallMap[i] = 0;
                     
-                    // Encontrar el color más cercano
-                    for(let c = 0; c < colorsRGB.length; c++) {
-                        const d = Math.abs(r - colorsRGB[c].r) + 
-                                  Math.abs(g - colorsRGB[c].g) + 
-                                  Math.abs(b - colorsRGB[c].b);
-                        if(d < minD) { 
-                            minD = d; 
-                            best = c; 
+                    // Solo procesar píxeles con alpha > 0
+                    if(sol[idx+3] > 0) {
+                        const r = sol[idx], g = sol[idx+1], b = sol[idx+2];
+                        let best = -1, minD = 999;
+                        
+                        // Encontrar el color más cercano
+                        for(let c = 0; c < colorsRGB.length; c++) {
+                            const d = Math.abs(r - colorsRGB[c].r) + 
+                                      Math.abs(g - colorsRGB[c].g) + 
+                                      Math.abs(b - colorsRGB[c].b);
+                            if(d < minD) { 
+                                minD = d; 
+                                best = c; 
+                            }
+                        }
+                        
+                        if(best !== -1 && minD < 15) { 
+                            pixelMap[best].push(i);
+                            pixelsRemaining[best]++;
                         }
                     }
-                    
-                    if(best !== -1 && minD < 15) { 
-                        pixelMap[best].push(i);
-                        pixelsRemaining[best]++;
+                }
+                
+                // Reportar progreso
+                processedPixels++;
+                if (processedPixels % reportInterval === 0 || processedPixels === totalPixels) {
+                    const progress = Math.floor((processedPixels / totalPixels) * 100);
+                    if (progress > lastReportedProgress) {
+                        lastReportedProgress = progress;
+                        self.postMessage({ 
+                            type: 'PREPROCESS_PROGRESS', 
+                            progress 
+                        });
                     }
                 }
             }
             
-            // Reportar progreso
-            processedPixels++;
-            if (processedPixels % reportInterval === 0) {
-                const progress = Math.floor((processedPixels / totalPixels) * 100);
-                self.postMessage({ 
-                    type: 'PREPROCESS_PROGRESS', 
-                    progress 
-                });
-            }
+            // Asegurar que se reporta 100%
+            self.postMessage({ 
+                type: 'PREPROCESS_PROGRESS', 
+                progress: 100 
+            });
+            
+            // Convertir pixelMap a TypedArrays para transferir eficientemente
+            const pixelMapSerialized = pixelMap.map(arr => new Int32Array(arr));
+            
+            self.postMessage({ 
+                type: 'PREPROCESS_COMPLETE',
+                wallBuffer: wallMap.buffer,
+                pixelMap: pixelMapSerialized,
+                pixelsRemaining
+            }, [wallMap.buffer, ...pixelMapSerialized.map(arr => arr.buffer)]);
+            
+        } catch (error) {
+            self.postMessage({ 
+                type: 'PREPROCESS_ERROR',
+                error: error.message
+            });
         }
-        
-        // Convertir pixelMap a TypedArrays para transferir eficientemente
-        const pixelMapSerialized = pixelMap.map(arr => new Int32Array(arr));
-        
-        self.postMessage({ 
-            type: 'PREPROCESS_COMPLETE',
-            wallBuffer: wallMap.buffer,
-            pixelMap: pixelMapSerialized,
-            pixelsRemaining
-        }, [wallMap.buffer, ...pixelMapSerialized.map(arr => arr.buffer)]);
     }
 
     if (type === 'FILL') {

@@ -139,6 +139,7 @@ const Game = {
         
         } else if (e.data.type === 'PREPROCESS_COMPLETE') {
             // Pre-procesamiento completado
+            console.log('✅ Pre-procesamiento completado');
             const { wallBuffer, pixelMap, pixelsRemaining } = e.data;
             
             this.cache.wallMap = new Uint8Array(wallBuffer);
@@ -149,10 +150,22 @@ const Game = {
             this.state.initialPixels = [...pixelsRemaining];
             
             // Guardar en caché para futuras cargas
-            this.saveProcessedDataToCache();
+            this.saveProcessedDataToCache().then(() => {
+                console.log('💾 Caché guardada');
+            }).catch(err => {
+                console.warn('⚠️ Error guardando caché:', err);
+            });
             
-            // Continuar con la carga del nivel
+            // Continuar con la carga del nivel (inmediatamente, no esperar al caché)
             this.finishLevelLoad();
+            
+        } else if (e.data.type === 'PREPROCESS_ERROR') {
+            console.error('❌ Error en pre-procesamiento:', e.data.error);
+            this.ui.loadingText.innerHTML = 'Error al procesar imagen';
+            // Intentar cargar de forma tradicional como fallback
+            setTimeout(() => {
+                this.ui.loading.classList.add('hidden');
+            }, 1000);
         }
     },
 
@@ -488,17 +501,20 @@ const Game = {
         try {
             const cached = await loadFromDB(this.getCacheKey());
             if (cached) {
+                console.log('🔍 Caché encontrada');
                 const cacheData = JSON.parse(cached);
                 if (cacheData.version === 1) {
                     this.state.pixelMap = cacheData.pixelMap;
                     this.state.pixelsRemaining = cacheData.pixelsRemaining;
                     this.state.initialPixels = [...cacheData.pixelsRemaining];
                     this.cache.wallMap = new Uint8Array(cacheData.wallMap);
+                    console.log('✅ Datos de caché cargados correctamente');
                     return true;
                 }
             }
+            console.log('ℹ️ No hay caché disponible');
         } catch(e) {
-            console.warn('Error cargando caché:', e);
+            console.warn('⚠️ Error cargando caché:', e);
         }
         return false;
     },
@@ -553,10 +569,14 @@ const Game = {
         
         if (cachedSuccess) {
             // ¡Caché encontrada! Saltar procesamiento
+            console.log('⚡ Cargado desde caché');
             this.ui.loadingText.innerHTML = '¡Cargado desde caché! ⚡';
-            setTimeout(() => this.finishLevelLoad(), 100);
+            // Pequeño delay para que se vea el mensaje
+            await new Promise(resolve => setTimeout(resolve, 300));
+            this.finishLevelLoad();
         } else {
             // No hay caché, procesar con worker
+            console.log('🔄 Procesando imagen por primera vez');
             this.ui.loadingText.innerHTML = 'Procesando imagen...<br><span style="font-size:2rem;color:#d63384">0%</span>';
             
             const linData = this.lCtx.getImageData(0, 0, w, h).data;
@@ -575,6 +595,7 @@ const Game = {
     },
 
     async finishLevelLoad() {
+        console.log('🎮 Finalizando carga del nivel');
         const w = this.ui.canvas.width;
         const h = this.ui.canvas.height;
         const levelId = this.state.currentLevel.id;
@@ -589,6 +610,7 @@ const Game = {
         // Cargar progreso guardado o iniciar nuevo
         const savedData = await loadFromDB(levelId);
         if(savedData) {
+            console.log('📂 Cargando progreso guardado');
             const img = new Image();
             img.onload = () => { 
                 this.ctx.drawImage(img, 0, 0);
@@ -597,14 +619,25 @@ const Game = {
                 this.generarPaletaUI(); 
                 this.selectColor(0); 
                 this.queueProgressUpdate();
+                console.log('✅ Nivel cargado completamente');
+                this.ui.loading.classList.add('hidden');
+                this.resetIdleTimer();
+            };
+            img.onerror = () => {
+                console.error('❌ Error cargando imagen guardada');
+                this.generarPaletaUI();
+                this.selectColor(0);
+                this.queueProgressUpdate();
                 this.ui.loading.classList.add('hidden');
                 this.resetIdleTimer();
             };
             img.src = savedData;
         } else { 
+            console.log('🆕 Iniciando nivel nuevo');
             this.generarPaletaUI();
             this.selectColor(0);
             this.queueProgressUpdate();
+            console.log('✅ Nivel cargado completamente');
             this.ui.loading.classList.add('hidden');
             this.resetIdleTimer();
         }
