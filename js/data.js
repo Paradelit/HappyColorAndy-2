@@ -4,6 +4,25 @@
 
 const niveles = [
     {
+        id: 'foto6',
+        nombre: 'Recuerdo 6',
+        nombreCompleto: 'Prueba florandy', // ¡Edita esto con el nombre real!
+        lineas: 'lineas6.jpg',     
+        solucion: 'solucion6.jpg', 
+        colores: [
+            '#321010', '#6a4b4a', '#491917', '#563634', '#efd1cf', '#442826', '#90706c', '#643e39', '#86645f', '#381d19',
+            '#522b23', '#e0bbb3', '#7c564b', '#d2a699', '#bd9285', '#7c4a37', '#aa7b69', '#94604c', '#7d3a1d', '#c98057',
+            '#b4683d', '#d6c05f', '#f7e17d', '#f7d73f', '#b5a141', '#887926', '#2c2c1d', '#39392b', '#40462f', '#191e0c',
+            '#2e3a15', '#8a9b68', '#506031', '#3e4e20', '#adbf8e', '#505843', '#768958', '#617444', '#1f2b0d', '#99ae85',
+            '#606c55', '#0b1207', '#6c7c68', '#758a78', '#7e9586', '#889f92', '#91aa9e', '#bdd7cb', '#a5bfb5', '#9ab5ab',
+            '#aecac2', '#c5c2e1', '#d9d6f5', '#d0cdec', '#b3b0cb', '#bdbad3', '#e4e1f6', '#9793ad', '#181623', '#a8a3be',
+            '#8b869a', '#7d788b', '#f2effa', '#cec7d9', '#453d4c', '#5a515f', '#a69bac', '#776a78', '#685e68', '#d09ec6',
+            '#f4b8e1', '#c281a7', '#a66e8e', '#2c2127', '#36282f', '#bba9b2', '#fa9fcc', '#ad507b', '#f784b9', '#f562a2',
+            '#9a4268', '#e83f85', '#413238', '#ba1853', '#853451', '#a58e96', '#947880', '#772138', '#7b565f', '#e1b1bc',
+            '#d9a2ae', '#26181b', '#c5969f', '#554447', '#180a0c', '#b5878a', '#220e0f', '#a18283', '#000000', '#0e0507'
+        ]
+    },
+    {
         id: 'foto1',
         nombre: 'Recuerdo 1',
         nombreCompleto: 'Alteandy', // Puedes cambiar este nombre por el título real

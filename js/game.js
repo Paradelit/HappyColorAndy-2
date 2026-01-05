@@ -400,25 +400,25 @@ const Game = {
         this.ui.btnBack.onclick = () => this.exitGame(false);
 
         this.ui.btnHint.onclick = () => {
-            this.showConfirm('hint', 'ðŸ’¡ Usar Pista', 'Â¿Quieres que te indiquemos dÃ³nde pintar un pÃ­xel difÃ­cil?', () => {
+            this.showConfirm('hint', 'Usar Pista', '¿Quieres que te indiquemos dónde pintar un píxel difícil?', () => {
                 this.useHint(); this.resetIdleTimer();
             });
         };
 
         this.ui.btnMagic.onclick = () => {
-            this.showConfirm('magic', 'âœ¨ Varita MÃ¡gica', 'Â¿Quieres completar automÃ¡ticamente todo el color seleccionado?', () => {
+            this.showConfirm('magic', 'Varita Mágica', '¿Quieres completar automáticamente todo el color seleccionado?', () => {
                 this.useMagic(); this.resetIdleTimer();
             });
         };
 
         this.ui.btnReset.onclick = () => {
-            this.showConfirm('reset', 'ðŸ—‘ï¸ Borrar Progreso', 'Â¡Cuidado! Se borrarÃ¡ todo lo que has pintado en esta foto.', () => {
+            this.showConfirm('reset', 'Borrar Progreso', '¡Cuidado! Se borrarán todo lo que has pintado en esta foto.', () => {
                 this.resetLevel();
             });
         };
 
         this.ui.btnDownload.onclick = () => {
-             this.showConfirm('download', 'ðŸ’¾ Descargar', 'Â¿Quieres guardar la imagen en tu dispositivo?', () => {
+             this.showConfirm('download', 'Descargar', '¿Quieres guardar la imagen en tu dispositivo?', () => {
                 this.downloadImage();
             });
         };
