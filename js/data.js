@@ -64,8 +64,8 @@ const niveles = [
         id: 'foto4',
         nombre: 'Recuerdo 4',
         nombreCompleto: 'Hakuna Matata', 
-        lineas: 'lineas3.jpg',
-        solucion: 'solucion3.jpg',
+        lineas: 'lineas3.png',
+        solucion: 'solucion3.png',
         colores: [
             '#402e1d', '#4f3b27', '#906e4c', '#c79f76', '#ad8964', '#463523', '#5b4d3e', '#d9b38a', '#e3d7ca', '#58442e',
             '#7a6854', '#dac8b4', '#644d33', '#917b62', '#6b5d4d', '#ebc394', '#796042', '#6c573d', '#302517', '#f6d4a8',

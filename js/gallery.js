@@ -112,12 +112,19 @@ async function renderGallery() {
             
             const imgEl = el.querySelector('.lazy-loading');
             
-            // Cargar imagen guardada o imagen de líneas
-            loadFromDB(nivel.id).then(savedImg => {
-                const imgSrc = savedImg || nivel.lineas;
-                imgEl.setAttribute('data-src', imgSrc);
+            if (isDone) {
+                // Si ya está completado, usamos la imagen de solución original (HD)
+                // en lugar de la captura del canvas guardada.
+                imgEl.setAttribute('data-src', nivel.solucion);
                 imgObserver.observe(imgEl);
-            });
+            } else {
+                // Si está en progreso, buscamos en la DB o ponemos las líneas
+                loadFromDB(nivel.id).then(savedImg => {
+                    const imgSrc = savedImg || nivel.lineas;
+                    imgEl.setAttribute('data-src', imgSrc);
+                    imgObserver.observe(imgEl);
+                });
+            }
             
             // Click handler para nivel desbloqueado
             el.onclick = () => Game.loadLevel(i);
