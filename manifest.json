@@ -1,6 +1,6 @@
 {
-  "name": "Andy´s Happy Color:Color by Numbers",
-  "short_name": "Andy´s Happy Color",
+  "name": "Andy's Happy Color:Color by Numbers",
+  "short_name": "Andy's Happy Color",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f0f4f8",
