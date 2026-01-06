@@ -70,7 +70,7 @@ function renderGallery() {
     nivelesOrdenados.forEach(nivel => {
         const isCompleted = Sync.isLevelCompleted(nivel.id);
         const item = document.createElement('div');
-        item.className = 'level-card';
+        item.className = 'gallery-item level-card';
         
         // --- CAMBIO PRINCIPAL AQUÍ ---
         const imgContainer = document.createElement('div');

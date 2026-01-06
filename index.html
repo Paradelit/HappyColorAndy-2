@@ -160,6 +160,46 @@
             overflow: hidden; /* Importante para el blur */
         }
 
+        /* El contenedor que agrupa la imagen y el candado */
+        .level-img-container {
+            position: relative;
+            width: 100%;
+            height: 160px; /* Altura fija igual que tenía antes thumb-preview */
+            background: #f0f0f0;
+            overflow: hidden;
+        }
+
+        /* Estilo común para imágenes bloqueadas y resueltas */
+        .level-img-solved, 
+        .level-img-locked {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Para que rellene el hueco sin deformarse */
+            display: block;
+        }
+
+        /* Ajuste específico para la imagen borrosa (bloqueada) */
+        .level-img-locked {
+            filter: grayscale(100%) blur(4px);
+            transform: scale(1.1); /* Zoom leve para evitar bordes blancos por el blur */
+            opacity: 0.8;
+        }
+
+        /* Asegurar que el candado quede centrado sobre la imagen */
+        .padlock-overlay {
+            position: absolute;
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            font-size: 40px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
         /* La imagen de líneas cuando está bloqueada */
         .level-img-locked {
             /* Blanco y negro, y muy borrosa */
