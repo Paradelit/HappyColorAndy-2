@@ -180,7 +180,7 @@
 
         /* Ajuste específico para la imagen borrosa (bloqueada) */
         .level-img-locked {
-            filter: grayscale(100%) blur(3px); 
+            filter: grayscale(100%) blur(1px); 
             
             transform: scale(1.1); 
             opacity: 0.7;
@@ -215,44 +215,38 @@
             border: 2px solid #555;
         }
 
-        /* CADENA 1 (Diagonal /) */
+        /* CADENA 1 (Diagonal /) con eslabones */
         .padlock-overlay::before {
-            content: '';
+            content: '⛓️⛓️⛓️⛓️⛓️⛓️';
             position: absolute;
-            width: 120%; /* Más largo que el ancho para cubrir esquinas */
-            height: 12px; /* Grosor de la cadena */
-            background: repeating-linear-gradient(
-                90deg,
-                #444,
-                #444 10px,
-                #222 10px,
-                #222 20px
-            ); /* Efecto rayado metálico */
+            font-size: 28px;
+            letter-spacing: -8px; /* Para que se superpongan un poco */
             transform: rotate(45deg);
             z-index: 1;
-            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
-            border: 1px solid #000;
+            text-shadow: 
+                2px 2px 4px rgba(0,0,0,0.6),
+                -1px -1px 2px rgba(255,255,255,0.3);
+            opacity: 0.9;
+            width: 150%;
+            text-align: center;
         }
 
-        /* CADENA 2 (Diagonal \) */
+        /* CADENA 2 (Diagonal \) con eslabones */
         .padlock-overlay::after {
-            content: '';
+            content: '⛓️⛓️⛓️⛓️⛓️⛓️';
             position: absolute;
-            width: 120%;
-            height: 12px;
-            background: repeating-linear-gradient(
-                90deg,
-                #444,
-                #444 10px,
-                #222 10px,
-                #222 20px
-            );
+            font-size: 28px;
+            letter-spacing: -8px;
             transform: rotate(-45deg);
             z-index: 1;
-            box-shadow: 0 5px 10px rgba(0,0,0,0.5);
-            border: 1px solid #000;
+            text-shadow: 
+                2px 2px 4px rgba(0,0,0,0.6),
+                -1px -1px 2px rgba(255,255,255,0.3);
+            opacity: 0.9;
+            width: 150%;
+            text-align: center;
         }
-
+        
         /* (Opcional) Un pequeño efecto al pasar el ratón por encima */
         .level-card.locked:hover .level-img-locked {
             filter: grayscale(90%) blur(5px); /* Se aclara un pelín */

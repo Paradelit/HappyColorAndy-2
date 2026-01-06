@@ -408,50 +408,22 @@ const Game = {
             if (this.cache.pendingAction) this.cache.pendingAction();
         };
 
-        const startPeek = (e) => {
-            if(e.cancelable) e.preventDefault();
-
-            // --- BLOQUE DE PROTECCIÓN ANTI-SPOILER ---
-            // Si el juego NO ha terminado Y aún no has aceptado el spoiler...
-            if (!this.state.isVictoryShown && !this.state.spoilerAccepted) {
-                // Soltamos el evento actual para que no se quede "enganchado"
-                
-                const confirmar = confirm(
-                    "🫣 ALERTA DE SPOILER\n\n" +
-                    "Estás a punto de ver la imagen final completa.\n" +
-                    "¿Seguro que quieres verla ahora?"
+        this.ui.btnSol.onclick = () => {
+            // Solo mostrar confirmación si el juego NO ha terminado
+            if (!this.state.isVictoryShown) {
+                this.showConfirm(
+                    'spoiler', 
+                    '🫣 Alerta de Spoiler', 
+                    'Estás a punto de ver la imagen final completa. Esto te mostrará cómo quedará el dibujo terminado.\n\n¿Seguro que quieres verla ahora?', 
+                    () => {
+                        this.peekSolution();
+                    }
                 );
-
-                if (confirmar) {
-                    this.state.spoilerAccepted = true; // Ya no preguntamos más en este nivel
-                } else {
-                    return; // Si cancela, no mostramos nada
-                }
-            }
-
-            if(this.cache.backupImg) return;
-            
-            this.cache.backupImg = this.ctx.getImageData(0,0, this.ui.canvas.width, this.ui.canvas.height); 
-            this.ctx.drawImage(this.assets.imgSolucion, 0, 0); 
-            this.ui.hlCanvas.style.opacity = '0'; 
-            this.ui.linesCanvas.style.opacity = '0'; 
-        };
-        
-        const endPeek = (e) => {
-             if(e && e.cancelable) e.preventDefault();
-             if(!this.cache.backupImg) return; 
-             this.ctx.putImageData(this.cache.backupImg, 0, 0); 
-             this.cache.backupImg = null; 
-             if(!this.state.isVictoryShown) { 
-                 this.ui.hlCanvas.style.opacity = '1'; 
-                 this.ui.linesCanvas.style.opacity = '1'; 
+            } else {
+                // Si ya terminó, mostrar directamente
+                this.peekSolution();
             }
         };
-
-        this.ui.btnSol.addEventListener('touchstart', startPeek, {passive:false}); 
-        this.ui.btnSol.addEventListener('touchend', endPeek);
-        this.ui.btnSol.addEventListener('mousedown', startPeek); 
-        window.addEventListener('mouseup', endPeek);
 
         if(this.ui.btnCloseVictory) this.ui.btnCloseVictory.onclick = () => this.closeVictory();
         if(this.ui.btnSound) {
@@ -1136,6 +1108,69 @@ const Game = {
         link.download = this.state.currentLevel.nombre + '.png';
         link.href = tempCanvas.toDataURL('image/png');
         link.click();
+    },
+
+    peekSolution: function() {
+        if(this.cache.backupImg) return; // Ya está mostrando
+        
+        // Guardar estado actual
+        this.cache.backupImg = this.ctx.getImageData(0, 0, this.ui.canvas.width, this.ui.canvas.height);
+        
+        // Mostrar solución
+        this.ctx.drawImage(this.assets.imgSolucion, 0, 0);
+        this.ui.hlCanvas.style.opacity = '0';
+        this.ui.linesCanvas.style.opacity = '0';
+        
+        // Añadir indicador visual
+        const indicator = document.createElement('div');
+        indicator.id = 'peek-indicator';
+        indicator.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(214, 51, 132, 0.95);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            z-index: 999;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+            animation: fadeIn 0.3s;
+            pointer-events: none;
+        `;
+        indicator.innerHTML = '👁️ Viendo Solución<br><small style="font-size:0.8rem">Toca para volver</small>';
+        document.body.appendChild(indicator);
+        
+        // Volver al hacer clic en cualquier parte
+        const hideSolution = () => {
+            if(!this.cache.backupImg) return;
+            
+            this.ctx.putImageData(this.cache.backupImg, 0, 0);
+            this.cache.backupImg = null;
+            
+            if(!this.state.isVictoryShown) {
+                this.ui.hlCanvas.style.opacity = '1';
+                this.ui.linesCanvas.style.opacity = '1';
+            }
+            
+            // Quitar indicador
+            const ind = document.getElementById('peek-indicator');
+            if(ind) ind.remove();
+            
+            // Remover listeners
+            this.ui.viewport.removeEventListener('click', hideSolution);
+            document.removeEventListener('keydown', hideOnEscape);
+        };
+        
+        const hideOnEscape = (e) => {
+            if(e.key === 'Escape') hideSolution();
+        };
+        
+        // Listeners para cerrar
+        this.ui.viewport.addEventListener('click', hideSolution, { once: true });
+        document.addEventListener('keydown', hideOnEscape, { once: true });
     },
 
     useHint: function() {
