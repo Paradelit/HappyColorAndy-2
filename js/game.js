@@ -510,6 +510,8 @@ const Game = {
         document.getElementById('gallery-screen').classList.add('hidden');
         this.ui.screen.classList.remove('hidden');
         this.ui.loading.classList.remove('hidden');
+        if(typeof audioPlayer !== 'undefined') audioPlayer.onEnterGame();
+
         
         this.state.isVictoryShown = false;
         this.ui.progressBar.style.width = '0%';
@@ -1020,7 +1022,10 @@ const Game = {
     },
 
     exitGame: function(isPopState = false) {
-        if(typeof bgMusic !== 'undefined') {
+        if(typeof audioPlayer !== 'undefined') {
+            audioPlayer.onExitGame();
+        } else if(typeof bgMusic !== 'undefined') {
+            // Fallback por si audio.js no está cargado
             bgMusic.pause();
             bgMusic.currentTime = 0;
         }
