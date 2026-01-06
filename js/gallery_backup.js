@@ -1,5 +1,5 @@
 // ==========================================
-// 🖼️ GALERÍA CON SISTEMA DE LLAVES
+// 🖼️ GALERÍA CON SISTEMA DE DESBLOQUEO (CORREGIDO)
 // ==========================================
 
 const galleryScreen = document.getElementById('gallery-screen');
@@ -37,10 +37,11 @@ const imgObserver = new IntersectionObserver((entries, observer) => {
 });
 
 // ==========================================
-// 🔑 RENDERIZADO CON SISTEMA DE LLAVES
+// 🔒 SISTEMA DE DESBLOQUEO
 // ==========================================
 
 function getSafeNiveles() {
+    // Intentamos encontrar la variable niveles de forma segura
     if (typeof niveles !== 'undefined') return niveles;
     if (typeof window.niveles !== 'undefined') return window.niveles;
     return [];
@@ -54,27 +55,38 @@ function renderGallery() {
         return;
     }
     
+    // Limpiamos la galería antes de pintar
     grid.innerHTML = ''; 
 
+    // OBTENER NIVELES (Corrección aquí: usamos la variable directa)
     const listaNiveles = getSafeNiveles();
 
     if (listaNiveles.length === 0) {
+        // Fallback visual si realmente no cargan
         grid.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Cargando recuerdos...<br><small>(Si no aparecen, recarga la página)</small></div>';
         return;
     }
 
-    // Ordenar niveles
+    // Ordenar niveles (hacemos una copia para no alterar el original)
     const nivelesOrdenados = [...listaNiveles].sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
     nivelesOrdenados.forEach((nivel, index) => {
-        // 🔑 NUEVA LÓGICA: Usar KeySystem
-        const isCompleted = typeof KeySystem !== 'undefined' 
-            ? KeySystem.isLevelCompleted(nivel.id)
-            : localStorage.getItem('completed_' + nivel.id) === 'true';
+        // Lógica de estado (Completado / Desbloqueado)
+        let isCompleted = false;
         
-        const isUnlocked = typeof KeySystem !== 'undefined'
-            ? KeySystem.isLevelUnlocked(nivel.id)
-            : (index === 0); // Solo el primero desbloqueado por defecto
+        if (typeof Sync !== 'undefined' && Sync.isLevelCompleted) {
+            isCompleted = Sync.isLevelCompleted(nivel.id);
+        } else {
+            isCompleted = localStorage.getItem('completed_' + nivel.id) === 'true';
+        }
+
+        // Lógica de desbloqueo
+        let isUnlocked = true;
+        if (index > 0) {
+            const prevId = nivelesOrdenados[index - 1].id;
+            const prevCompleted = localStorage.getItem('completed_' + prevId) === 'true';
+            if (!prevCompleted) isUnlocked = false;
+        }
 
         // Crear tarjeta
         const item = document.createElement('div');
@@ -95,7 +107,7 @@ function renderGallery() {
             
             const badge = document.createElement('div');
             badge.className = 'check-badge';
-            badge.innerHTML = '✔';
+            badge.innerHTML = '✓';
             item.appendChild(badge);
 
             imgContainer.appendChild(img);
@@ -106,14 +118,16 @@ function renderGallery() {
 
         } else if (isUnlocked) {
             // -- JUGABLE (DESBLOQUEADO / NIVEL ACTUAL) --
-            item.classList.add('unlocked', 'current-level');
+            item.classList.add('unlocked', 'current-level'); // Añadimos clase extra
             img.src = nivel.lineas; 
             img.className = 'level-img-solved'; 
             
+            // --- NUEVO: Badge de Paleta ---
             const badge = document.createElement('div');
             badge.className = 'palette-badge';
-            badge.innerHTML = '🎨';
+            badge.innerHTML = '🎨'; // Icono de paleta
             item.appendChild(badge);
+            // -----------------------------
             
             imgContainer.appendChild(img);
             item.onclick = () => startGame(nivel.id);
@@ -128,22 +142,15 @@ function renderGallery() {
             padlockOverlay.className = 'padlock-overlay';
             padlockOverlay.innerHTML = '<span class="lock-icon">🔒</span>';
 
-            // 🔑 NUEVO: Badge de costo
-            const costBadge = document.createElement('div');
-            costBadge.className = 'lock-cost-badge';
-            costBadge.innerHTML = '🔑 1';
-            
             imgContainer.appendChild(img);
             imgContainer.appendChild(padlockOverlay);
-            imgContainer.appendChild(costBadge);
             
-            // 🔑 NUEVO: Click para desbloquear
-            item.onclick = () => showUnlockModal(nivel);
+            item.onclick = () => showLockedMessage(index);
         }
 
         const title = document.createElement('div');
         title.className = 'level-title thumb-title'; 
-        title.textContent = isCompleted ? nivel.nombreCompleto : `Nivel ${index + 1}`;
+        title.textContent = isCompleted ? nivel.nombre : `Nivel ${index + 1}`;
         
         item.appendChild(imgContainer); 
         item.appendChild(title);
@@ -159,61 +166,10 @@ function updateCounter() {
     if (!counter || lista.length === 0) return;
     
     let completed = 0;
-    let unlocked = 0;
-    
     lista.forEach(n => {
-        if (typeof KeySystem !== 'undefined') {
-            if (KeySystem.isLevelCompleted(n.id)) completed++;
-            if (KeySystem.isLevelUnlocked(n.id)) unlocked++;
-        } else {
-            if (localStorage.getItem('completed_' + n.id) === 'true') completed++;
-        }
+        if (localStorage.getItem('completed_' + n.id) === 'true') completed++;
     });
-    
-    counter.innerHTML = `
-        Completados: ${completed}/${lista.length} 
-        <span style="color: #999; margin-left: 10px;">• Desbloqueados: ${unlocked}/${lista.length}</span>
-    `;
-}
-
-// ==========================================
-// 🔑 MODAL DE DESBLOQUEO
-// ==========================================
-function showUnlockModal(nivel) {
-    if (typeof KeySystem === 'undefined') {
-        console.error('KeySystem no está disponible');
-        return;
-    }
-    
-    // Vibración
-    if (navigator.vibrate) navigator.vibrate(200);
-    
-    // Mostrar modal de confirmación
-    KeySystem.showUnlockConfirmation(nivel, () => {
-        // Callback: Se ejecuta después de desbloquear
-        renderGallery(); // Re-renderizar para mostrar el nivel desbloqueado
-        
-        // Opcional: Mostrar toast de éxito
-        showUnlockSuccessToast(nivel);
-    });
-}
-
-function showUnlockSuccessToast(nivel) {
-    const toast = document.createElement('div');
-    toast.className = 'unlock-success-toast';
-    toast.innerHTML = `
-        <div class="toast-content">
-            🔓 <strong>${nivel.nombre}</strong> desbloqueado
-        </div>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 2500);
+    counter.textContent = `Completados: ${completed}/${lista.length}`;
 }
 
 // ==========================================
@@ -233,6 +189,38 @@ window.startGame = function(id) {
 window.showSolucion = function(nivel) {
     window.startGame(nivel.id);
 };
+
+// ==========================================
+// 💬 MENSAJE BLOQUEADO
+// ==========================================
+function showLockedMessage(levelIndex) {
+    if (navigator.vibrate) navigator.vibrate(200);
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); z-index: 9999;
+        display: flex; justify-content: center; align-items: center;
+        animation: fadeIn 0.2s;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 20px; padding: 30px; max-width: 300px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3); animation: popIn 0.3s;">
+            <div style="font-size: 50px; margin-bottom: 15px;">🔒</div>
+            <h3 style="color: #d63384; margin: 0 0 10px 0; font-size: 1.3rem;">Bloqueado</h3>
+            <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem; line-height: 1.4;">
+                Debes completar el <strong>Nivel ${levelIndex}</strong> para desbloquear este dibujo.
+            </p>
+            <button class="confirm-btn ok" style="background:#d63384; color:white; border:none; padding:10px 25px; border-radius:20px; font-weight:bold; cursor:pointer;">Entendido</button>
+        </div>
+    `;
+    
+    const close = () => { if(modal.parentNode) modal.parentNode.removeChild(modal); };
+    modal.onclick = (e) => { if(e.target === modal) close(); };
+    modal.querySelector('button').onclick = close;
+    
+    document.body.appendChild(modal);
+}
 
 // ==========================================
 // 🔄 PULL TO REFRESH & EVENTS
@@ -273,6 +261,7 @@ if (galleryScreen) {
 
 // INICIO SEGURO
 const startApp = () => {
+    // Intentar renderizar
     renderGallery();
     
     // Configurar botón de sonido
@@ -290,42 +279,4 @@ if (typeof initDB === 'function') {
 } else {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startApp);
     else startApp();
-}
-
-// ==========================================
-// 🎨 ESTILOS ADICIONALES
-// ==========================================
-const toastStyles = `
-<style id="unlock-toast-styles">
-    .unlock-success-toast {
-        position: fixed;
-        bottom: -100px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 50px;
-        font-size: 0.95rem;
-        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
-        z-index: 4000;
-        transition: bottom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        white-space: nowrap;
-        max-width: 90%;
-    }
-    
-    .unlock-success-toast.show {
-        bottom: 30px;
-    }
-    
-    .toast-content {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-</style>
-`;
-
-if (!document.getElementById('unlock-toast-styles')) {
-    document.head.insertAdjacentHTML('beforeend', toastStyles);
 }

@@ -958,7 +958,11 @@ const Game = {
         // Actualizar título en tiempo real al nombre completo
         this.ui.title.innerText = this.state.currentLevel.nombreCompleto;
         
-        localStorage.setItem('completed_' + this.state.currentLevel.id, 'true');
+        if (typeof KeySystem !== 'undefined') {
+            KeySystem.completeLevel(this.state.currentLevel.id);
+        } else {
+            localStorage.setItem('completed_' + this.state.currentLevel.id, 'true');
+        }
         
         // 1. FADE OUT de guías
         this.ui.hlCanvas.style.transition = 'opacity 1s ease';

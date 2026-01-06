@@ -77,8 +77,14 @@ async function syncToCloud() {
         const syncData = {
             completed: {},
             savedProgress: {},
+            unlocked: {},      // 🔑 NUEVO: Niveles desbloqueados
+            keys: 0,           // 🔑 NUEVO: Cantidad de llaves
             lastSync: Date.now()
         };
+        
+        if (typeof KeySystem !== 'undefined') {
+            syncData.keys = KeySystem.getKeys();
+        }
         
         // Calculamos el peso inicial del JSON base (estimado)
         let currentPayloadSize = JSON.stringify(syncData).length;
@@ -89,8 +95,16 @@ async function syncToCloud() {
             const isCompleted = localStorage.getItem('completed_' + nivel.id) === 'true';
             if (isCompleted) {
                 syncData.completed[nivel.id] = true;
-                // Sumamos un peso estimado de esta entrada
                 currentPayloadSize += 50; 
+            }
+            
+            // 🔑 NUEVO: Guardar niveles desbloqueados
+            if (typeof KeySystem !== 'undefined') {
+                const isUnlocked = KeySystem.isLevelUnlocked(nivel.id);
+                if (isUnlocked) {
+                    syncData.unlocked[nivel.id] = true;
+                    currentPayloadSize += 50;
+                }
             }
         });
 
@@ -156,6 +170,18 @@ async function syncFromCloud(code) {
                 localStorage.setItem('completed_' + nivelId, 'true');
             });
         }
+
+        // 🔑 NUEVO: Restaurar niveles desbloqueados
+        if (syncData.unlocked) {
+            Object.keys(syncData.unlocked).forEach(nivelId => {
+                localStorage.setItem('unlocked_' + nivelId, 'true');
+            });
+        }
+
+        // 🔑 NUEVO: Restaurar llaves
+        if (typeof syncData.keys !== 'undefined' && typeof KeySystem !== 'undefined') {
+            KeySystem.setKeys(syncData.keys);
+        }
         
         if (syncData.savedProgress) {
             for (let nivelId in syncData.savedProgress) {
@@ -197,10 +223,21 @@ async function pullFromCloud() {
         if (serverTime > localTime) {
             console.log('📥 Datos del servidor más recientes, actualizando...');
             
-            if (syncData.completed) {
-                Object.keys(syncData.completed).forEach(nivelId => {
-                    localStorage.setItem('completed_' + nivelId, 'true');
+            if (syncData.unlocked) {
+                Object.keys(syncData.unlocked).forEach(nivelId => {
+                    localStorage.setItem('unlocked_' + nivelId, 'true');
                 });
+            }
+
+            // 🔑 NUEVO: Sincronizar llaves
+            if (typeof syncData.keys !== 'undefined' && typeof KeySystem !== 'undefined') {
+                const localKeys = KeySystem.getKeys();
+                const serverKeys = syncData.keys;
+                
+                // Usar el valor más alto (por si hubo progreso offline en otro dispositivo)
+                if (serverKeys > localKeys) {
+                    KeySystem.setKeys(serverKeys);
+                }
             }
             
             if (syncData.savedProgress) {
@@ -383,8 +420,12 @@ const Sync = {
     getSyncCode,
     startAutoSync,
     stopAutoSync,
-    syncNow,        // Nueva: sincronización inmediata con throttle
-    pullFromCloud   // Nueva: pull automático
+    syncNow,
+    pullFromCloud,
+    syncKeySystemState,  // 🔑 NUEVO
+    isLevelCompleted: (levelId) => {
+        return localStorage.getItem('completed_' + levelId) === 'true';
+    }
 };
 
 // Inicializar y hacer pull al cargar la app
@@ -463,5 +504,17 @@ window.addEventListener('online', () => {
         Sync.syncNow();
     }
 });
+
+function syncKeySystemState() {
+    if (typeof KeySystem === 'undefined') return;
+    
+    // Forzar actualización del display
+    KeySystem.updateKeysDisplay();
+    
+    // Re-renderizar galería para reflejar cambios
+    if (typeof renderGallery === 'function') {
+        renderGallery();
+    }
+}
 
 window.Sync = Sync;
