@@ -1,4 +1,4 @@
-const CACHE_NAME = 'happy-andy-v25';
+const CACHE_NAME = 'happy-andy-vFinal';
 
 // Lista de archivos vitales para que la app arranque
 const STATIC_ASSETS = [

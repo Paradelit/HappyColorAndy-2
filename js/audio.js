@@ -135,6 +135,8 @@ function onExitGame() {
     if (bgMusic) {
         bgMusic.pause();
         bgMusic.currentTime = 0;
+        bgMusic.onended = null; // 🆕 CRÍTICO: Limpiar el listener para evitar reproducciones en galería
+        bgMusic.oncanplaythrough = null; // 🆕 Limpiar también este listener
     }
 }
 
@@ -159,9 +161,3 @@ window.audioPlayer = {
     getCurrentTrack: () => currentTrackIndex,
     getPlaylist: () => bgMusicPlaylist
 };
-
-// Precargar canciones en segundo plano
-bgMusicPlaylist.forEach(src => {
-    const preload = new Audio(src);
-    preload.preload = 'auto';
-});
