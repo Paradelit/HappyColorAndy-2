@@ -117,10 +117,17 @@ function renderGallery() {
             };
 
         } else if (isUnlocked) {
-            // -- JUGABLE (DESBLOQUEADO) --
-            item.classList.add('unlocked');
+            // -- JUGABLE (DESBLOQUEADO / NIVEL ACTUAL) --
+            item.classList.add('unlocked', 'current-level'); // Añadimos clase extra
             img.src = nivel.lineas; 
             img.className = 'level-img-solved'; 
+            
+            // --- NUEVO: Badge de Paleta ---
+            const badge = document.createElement('div');
+            badge.className = 'palette-badge';
+            badge.innerHTML = '🎨'; // Icono de paleta
+            item.appendChild(badge);
+            // -----------------------------
             
             imgContainer.appendChild(img);
             item.onclick = () => startGame(nivel.id);
