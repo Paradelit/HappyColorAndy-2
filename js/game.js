@@ -936,10 +936,10 @@ const Game = {
         const pct = (ok / totalPixels) * 100;
         this.ui.progressBar.style.width = pct + '%';
 
-        if(pct > 10) {
+        if(pct > 90) {
             this.ui.btnMagic.classList.add('active');
             this.ui.btnHint.classList.add('active');
-        } else if (pct > 5) {
+        } else if (pct > 75) {
             this.ui.btnHint.classList.add('active');
             this.ui.btnMagic.classList.remove('active');
         } else {
