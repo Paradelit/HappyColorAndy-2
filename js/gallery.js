@@ -1,5 +1,5 @@
 // ==========================================
-// 🖼️ GALERÍA CON SISTEMA DE DESBLOQUEO (FINAL)
+// 🖼️ GALERÍA CON SISTEMA DE DESBLOQUEO (CORREGIDO)
 // ==========================================
 
 const galleryScreen = document.getElementById('gallery-screen');
@@ -18,7 +18,6 @@ const imgObserver = new IntersectionObserver((entries, observer) => {
             const img = entry.target;
             const src = img.getAttribute('data-src');
             if (src && !img.src.includes(src)) {
-                // Usamos requestIdleCallback para no bloquear la UI
                 const loadImg = () => {
                     img.src = src;
                     window.imageCache[src] = img;
@@ -41,39 +40,47 @@ const imgObserver = new IntersectionObserver((entries, observer) => {
 // 🔒 SISTEMA DE DESBLOQUEO
 // ==========================================
 
+function getSafeNiveles() {
+    // Intentamos encontrar la variable niveles de forma segura
+    if (typeof niveles !== 'undefined') return niveles;
+    if (typeof window.niveles !== 'undefined') return window.niveles;
+    return [];
+}
+
 function renderGallery() {
-    // 1. CORRECCIÓN: Usamos el ID correcto que tienes en el HTML
     const grid = document.getElementById('gallery-grid');
     
     if (!grid) {
-        console.error("❌ ERROR CRÍTICO: No existe el elemento #gallery-grid en el HTML");
+        console.error("❌ ERROR: No existe el elemento #gallery-grid en el HTML");
         return;
     }
     
     // Limpiamos la galería antes de pintar
     grid.innerHTML = ''; 
 
-    // Verificamos que existan datos
-    if (!window.niveles || window.niveles.length === 0) {
-        grid.innerHTML = '<div style="padding:20px; text-align:center">No hay niveles cargados. Revisa data.js</div>';
+    // OBTENER NIVELES (Corrección aquí: usamos la variable directa)
+    const listaNiveles = getSafeNiveles();
+
+    if (listaNiveles.length === 0) {
+        // Fallback visual si realmente no cargan
+        grid.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Cargando recuerdos...<br><small>(Si no aparecen, recarga la página)</small></div>';
         return;
     }
 
-    // Ordenar niveles
-    const nivelesOrdenados = [...window.niveles].sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    // Ordenar niveles (hacemos una copia para no alterar el original)
+    const nivelesOrdenados = [...listaNiveles].sort((a, b) => (a.orden || 0) - (b.orden || 0));
 
     nivelesOrdenados.forEach((nivel, index) => {
         // Lógica de estado (Completado / Desbloqueado)
         let isCompleted = false;
         
-        // Intentar leer de Sync o LocalStorage
         if (typeof Sync !== 'undefined' && Sync.isLevelCompleted) {
             isCompleted = Sync.isLevelCompleted(nivel.id);
         } else {
             isCompleted = localStorage.getItem('completed_' + nivel.id) === 'true';
         }
 
-        // Lógica de desbloqueo: El nivel 0 siempre abierto, los demás dependen del anterior
+        // Lógica de desbloqueo
         let isUnlocked = true;
         if (index > 0) {
             const prevId = nivelesOrdenados[index - 1].id;
@@ -83,11 +90,8 @@ function renderGallery() {
 
         // Crear tarjeta
         const item = document.createElement('div');
-        
-        // 2. CORRECCIÓN: Añadimos 'gallery-item' para que pille el CSS (fondo blanco, sombra)
         item.className = 'gallery-item level-card'; 
         
-        // Contenedor de imagen
         const imgContainer = document.createElement('div');
         imgContainer.className = 'level-img-container';
 
@@ -101,7 +105,6 @@ function renderGallery() {
             img.src = nivel.solucion; 
             img.className = 'level-img-solved';
             
-            // Badge de Check verde
             const badge = document.createElement('div');
             badge.className = 'check-badge';
             badge.innerHTML = '✓';
@@ -117,7 +120,7 @@ function renderGallery() {
             // -- JUGABLE (DESBLOQUEADO) --
             item.classList.add('unlocked');
             img.src = nivel.lineas; 
-            img.className = 'level-img-solved'; // Usamos esta clase para que se vea nítido
+            img.className = 'level-img-solved'; 
             
             imgContainer.appendChild(img);
             item.onclick = () => startGame(nivel.id);
@@ -126,9 +129,8 @@ function renderGallery() {
             // -- BLOQUEADO --
             item.classList.add('locked');
             img.src = nivel.lineas;
-            img.className = 'level-img-locked'; // Clase con blur
+            img.className = 'level-img-locked'; 
 
-            // Overlay del candado
             const padlockOverlay = document.createElement('div');
             padlockOverlay.className = 'padlock-overlay';
             padlockOverlay.innerHTML = '<span class="lock-icon">🔒</span>';
@@ -139,42 +141,38 @@ function renderGallery() {
             item.onclick = () => showLockedMessage(index);
         }
 
-        // Título debajo de la imagen
         const title = document.createElement('div');
-        title.className = 'level-title thumb-title'; // thumb-title asegura el padding del CSS
+        title.className = 'level-title thumb-title'; 
         title.textContent = isCompleted ? nivel.nombre : `Nivel ${index + 1}`;
         
-        // Ensamblar
         item.appendChild(imgContainer); 
         item.appendChild(title);
-        
-        // Añadir al grid
         grid.appendChild(item);
     });
     
-    // Actualizar contador
     updateCounter();
 }
 
 function updateCounter() {
     const counter = document.getElementById('gallery-counter');
-    if (!counter || !window.niveles) return;
+    const lista = getSafeNiveles();
+    if (!counter || lista.length === 0) return;
     
     let completed = 0;
-    window.niveles.forEach(n => {
+    lista.forEach(n => {
         if (localStorage.getItem('completed_' + n.id) === 'true') completed++;
     });
-    counter.textContent = `Completados: ${completed}/${window.niveles.length}`;
+    counter.textContent = `Completados: ${completed}/${lista.length}`;
 }
 
 // ==========================================
-// 🚀 FUNCIONES GLOBALES DE INICIO
+// 🚀 FUNCIONES GLOBALES
 // ==========================================
 
 window.startGame = function(id) {
     if (typeof Game !== 'undefined') {
-        // Encontrar el índice en el array original
-        const index = niveles.findIndex(n => n.id === id);
+        const lista = getSafeNiveles();
+        const index = lista.findIndex(n => n.id === id);
         if (index !== -1) Game.loadLevel(index);
     } else {
         console.error("Game object no encontrado");
@@ -182,17 +180,13 @@ window.startGame = function(id) {
 };
 
 window.showSolucion = function(nivel) {
-    // Reutilizamos startGame para abrirlo, ya que el juego detectará que está completo
-    // y mostrará la victoria automáticamente.
     window.startGame(nivel.id);
 };
 
 // ==========================================
-// 💬 MENSAJE DE NIVEL BLOQUEADO
+// 💬 MENSAJE BLOQUEADO
 // ==========================================
 function showLockedMessage(levelIndex) {
-    const previousLevel = niveles[levelIndex - 1];
-    
     if (navigator.vibrate) navigator.vibrate(200);
     
     const modal = document.createElement('div');
@@ -208,22 +202,21 @@ function showLockedMessage(levelIndex) {
             <div style="font-size: 50px; margin-bottom: 15px;">🔒</div>
             <h3 style="color: #d63384; margin: 0 0 10px 0; font-size: 1.3rem;">Bloqueado</h3>
             <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem; line-height: 1.4;">
-                Debes completar el <strong>Nivel ${levelIndex}</strong> para pintar este dibujo.
+                Debes completar el <strong>Nivel ${levelIndex}</strong> para desbloquear este dibujo.
             </p>
-            <button class="confirm-btn ok" style="background:#d63384; color:white; border:none; padding:10px 25px; border-radius:20px; font-weight:bold;">Entendido</button>
+            <button class="confirm-btn ok" style="background:#d63384; color:white; border:none; padding:10px 25px; border-radius:20px; font-weight:bold; cursor:pointer;">Entendido</button>
         </div>
     `;
     
     const close = () => { if(modal.parentNode) modal.parentNode.removeChild(modal); };
-    modal.onclick = close;
+    modal.onclick = (e) => { if(e.target === modal) close(); };
     modal.querySelector('button').onclick = close;
     
     document.body.appendChild(modal);
-    setTimeout(close, 4000);
 }
 
 // ==========================================
-// 🔄 PULL TO REFRESH
+// 🔄 PULL TO REFRESH & EVENTS
 // ==========================================
 let ptrStartY = 0, ptrDist = 0;
 
@@ -251,7 +244,6 @@ if (galleryScreen) {
         ptrStartY = 0; ptrDist = 0;
     });
     
-    // Scroll optimization
     let scrollTimeout;
     galleryScreen.addEventListener('scroll', () => {
         document.body.classList.add('scrolling');
@@ -260,23 +252,12 @@ if (galleryScreen) {
     }, { passive: true });
 }
 
-// ==========================================
-// 🚀 INICIALIZACIÓN SEGURA
-// ==========================================
-
-// Función auxiliar para desbloquear el primer nivel si es necesario
-function getFirstUncompletedLevel() {
-    for (let i = 0; i < niveles.length; i++) {
-        if (localStorage.getItem('completed_' + niveles[i].id) !== 'true') return i;
-    }
-    return 0;
-}
-
-// Iniciar galería
+// INICIO SEGURO
 const startApp = () => {
-    console.log("🚀 Iniciando Galería...");
+    // Intentar renderizar
     renderGallery();
-    // Sonido
+    
+    // Configurar botón de sonido
     const btnSoundGal = document.getElementById('btn-sound-gallery');
     if(btnSoundGal) {
         btnSoundGal.onclick = () => {
@@ -285,19 +266,10 @@ const startApp = () => {
     }
 };
 
-// Intentar cargar DB, si falla o tarda, cargar galería igual
+// Cargar DB o iniciar directamente
 if (typeof initDB === 'function') {
-    initDB()
-        .then(() => startApp())
-        .catch(err => {
-            console.warn("Error DB:", err);
-            startApp();
-        });
+    initDB().then(startApp).catch(startApp);
 } else {
-    // Si no hay DB, cargar directamente
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startApp);
-    } else {
-        startApp();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startApp);
+    else startApp();
 }
