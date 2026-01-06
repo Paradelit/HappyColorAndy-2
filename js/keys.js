@@ -20,12 +20,15 @@ const KeySystem = {
     },
 
     // Añadir llaves
-    addKeys(amount = 1) {
+    addKeys(amount = 1, showAnimation = false) {
         const current = this.getKeys();
         this.setKeys(current + amount);
         
-        // Mostrar animación de ganancia
-        this.showKeysGainedAnimation(amount);
+        // Solo mostrar animación si se pide explícitamente
+        // (no se usará desde completeLevel, se integrará en modal de victoria)
+        if (showAnimation) {
+            this.showKeysGainedAnimation(amount);
+        }
     },
 
     // Gastar llaves
@@ -40,9 +43,9 @@ const KeySystem = {
 
     // Verificar si un nivel está desbloqueado
     isLevelUnlocked(levelId) {
-        // El primer nivel siempre está desbloqueado
+        // Los 2 primeros niveles siempre están desbloqueados
         if (typeof niveles !== 'undefined' && niveles.length > 0) {
-            if (levelId === niveles[0].id) return true;
+            if (levelId === niveles[0].id || levelId === niveles[1].id) return true;
         }
         
         return localStorage.getItem('unlocked_' + levelId) === 'true';
@@ -73,12 +76,18 @@ const KeySystem = {
         if (!wasAlreadyCompleted) {
             this.addKeys(1);
             console.log('🎉 ¡Nivel completado por primera vez! +1 🔑');
+            
+            // NO mostrar modal separado, se integrará en el modal de victoria
+            // return true indica que es primera vez (para que game.js lo sepa)
+            return true;
         }
         
         // Sincronizar
         if (typeof Sync !== 'undefined' && Sync.syncNow) {
             Sync.syncNow();
         }
+        
+        return false; // No es primera vez
     },
 
     // Actualizar la visualización de llaves en la UI
@@ -117,6 +126,20 @@ const KeySystem = {
         }, 2500);
     },
 
+    // Generar HTML para insertar en el modal de victoria
+    getKeyRewardHTML(amount = 1) {
+        return `
+            <div class="victory-key-reward">
+                <div class="key-reward-icon">🔑</div>
+                <div class="key-reward-text">
+                    <strong>¡Llave Conseguida!</strong>
+                    <span>+${amount} llave${amount > 1 ? 's' : ''}</span>
+                </div>
+            </div>
+            <p class="victory-key-hint">Úsala para desbloquear el recuerdo que quieras</p>
+        `;
+    },
+
     // Mostrar modal de confirmación para desbloquear nivel
     showUnlockConfirmation(nivel, onConfirm) {
         const keys = this.getKeys();
@@ -136,12 +159,15 @@ const KeySystem = {
                 </div>
                 
                 <div class="unlock-preview">
-                    <img src="${nivel.lineas}" alt="${nivel.nombre}">
+                    <div class="unlock-preview-container">
+                        <img src="${nivel.lineas}" alt="${nivel.nombre}" class="unlock-preview-img">
+                        <div class="unlock-preview-lock">🔒</div>
+                    </div>
                     <div class="unlock-name">${nivel.nombre}</div>
                 </div>
                 
                 <div class="unlock-cost">
-                    <div class="cost-label">Costo:</div>
+                    <div class="cost-label">Precio:</div>
                     <div class="cost-amount">🔑 1 llave</div>
                 </div>
                 
@@ -201,9 +227,12 @@ const KeySystem = {
 
     // Inicializar el sistema
     init() {
-        // Asegurar que el primer nivel esté desbloqueado
+        // Asegurar que los 2 primeros niveles estén desbloqueados
         if (typeof niveles !== 'undefined' && niveles.length > 0) {
             this.unlockLevel(niveles[0].id);
+            if (niveles.length > 1) {
+                this.unlockLevel(niveles[1].id);
+            }
         }
         
         // Actualizar display inicial
@@ -359,13 +388,39 @@ const keysStyles = `
         margin-bottom: 20px;
     }
     
-    .unlock-preview img {
-        width: 150px;
-        height: 150px;
-        object-fit: cover;
+    .unlock-preview-container {
+        position: relative;
+        width: 180px;
+        height: 180px;
+        margin: 0 auto 10px;
         border-radius: 15px;
+        overflow: hidden;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-        margin-bottom: 10px;
+    }
+    
+    .unlock-preview-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: grayscale(100%) blur(3px);
+        transform: scale(1.1);
+        opacity: 0.7;
+    }
+    
+    .unlock-preview-lock {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 50px;
+        background: rgba(0, 0, 0, 0.6);
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     }
     
     .unlock-name {
@@ -451,7 +506,7 @@ const keysStyles = `
         margin: 15px 0;
     }
 
-    /* Badge de costo en nivel bloqueado */
+    /* Badge de precio en nivel bloqueado */
     .lock-cost-badge {
         position: absolute;
         bottom: 10px;
@@ -468,6 +523,63 @@ const keysStyles = `
         display: flex;
         align-items: center;
         gap: 5px;
+    }
+
+    /* Recompensa de llave en modal de victoria */
+    .victory-key-reward {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        padding: 15px 25px;
+        border-radius: 20px;
+        margin: 20px 0 10px 0;
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        animation: keyRewardPulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    @keyframes keyRewardPulse {
+        0% { transform: scale(0.8); opacity: 0; }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    
+    .key-reward-icon {
+        font-size: 40px;
+        animation: keyRewardRotate 0.8s ease;
+    }
+    
+    @keyframes keyRewardRotate {
+        0% { transform: rotate(0deg); }
+        50% { transform: rotate(180deg) scale(1.2); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .key-reward-text {
+        display: flex;
+        flex-direction: column;
+        color: white;
+        text-align: left;
+    }
+    
+    .key-reward-text strong {
+        font-size: 1.2rem;
+        margin-bottom: 3px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+    }
+    
+    .key-reward-text span {
+        font-size: 1rem;
+        opacity: 0.95;
+    }
+    
+    .victory-key-hint {
+        color: #666;
+        font-size: 0.85rem;
+        margin: 0 0 15px 0;
+        text-align: center;
+        font-style: italic;
     }
 </style>
 `;

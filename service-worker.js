@@ -1,4 +1,4 @@
-const CACHE_NAME = 'happy-andy-v22';
+const CACHE_NAME = 'happy-andy-v23';
 
 // Lista de archivos vitales para que la app arranque
 const STATIC_ASSETS = [
@@ -12,11 +12,9 @@ const STATIC_ASSETS = [
     './js/data.js',
     './js/audio.js',
     './js/worker.js',
-    // Archivos de audio (asegúrate que existan en la carpeta raíz como indica tu audio.js)
     './bg-music.mp3',
     './paint-ok.mp3',
     './victory.mp3',
-    // Librería externa (Ver nota abajo sobre esto)
     'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js'
 ];
 

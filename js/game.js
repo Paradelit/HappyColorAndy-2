@@ -958,6 +958,12 @@ const Game = {
         // Actualizar título en tiempo real al nombre completo
         this.ui.title.innerText = this.state.currentLevel.nombreCompleto;
         
+        // ⚠️ IMPORTANTE: Marcar como completado ANTES de verificar
+        const isFirstTime = typeof KeySystem !== 'undefined' 
+            ? !KeySystem.isLevelCompleted(this.state.currentLevel.id)
+            : false;
+        
+        // 🔑 Marcar nivel como completado y dar llave
         if (typeof KeySystem !== 'undefined') {
             KeySystem.completeLevel(this.state.currentLevel.id);
         } else {
@@ -991,15 +997,13 @@ const Game = {
             this.state.pY = targetY;
             this.updateTransform();
             
-            // 4. CAMBIO: Añadir el marco SOLO cuando el zoom termine (1500ms)
-            // Esto evita el parpadeo por repintado excesivo en móviles
             setTimeout(() => {
                 this.ui.canvas.classList.add('framed-art');
             }, 1550); 
             
         }, 300);
         
-        // 5. Confetti (igual que antes)
+        // 4. Confetti
         setTimeout(() => {
             confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#d63384', '#667eea', '#764ba2', '#f093fb', '#4facfe'] });
         }, 500);
@@ -1008,12 +1012,25 @@ const Game = {
             confetti({ particleCount: 80, spread: 100, origin: { y: 0.7 }, colors: ['#FFD700', '#FFA500', '#FF69B4', '#00CED1'] });
         }, 900);
         
-        // 6. Mostrar MODAL (Corregido con IMG)
+        // 5. Mostrar MODAL con recompensa de llave si es primera vez
         setTimeout(() => {
             this.ui.victoryTitle.innerText = this.state.currentLevel.nombreCompleto;
-            
-            // CAMBIO: Usar src de imagen directamente
             this.ui.victoryImg.src = this.assets.imgSolucion.src;
+            
+            // 🔑 NUEVO: Añadir recompensa de llave si es primera vez
+            if (isFirstTime && typeof KeySystem !== 'undefined') {
+                const keyRewardHTML = KeySystem.getKeyRewardHTML(1);
+                const memoryTitle = this.ui.victoryModal.querySelector('.victory-memory-title');
+                
+                // Limpiar recompensas anteriores si existen
+                const oldReward = this.ui.victoryModal.querySelector('.victory-key-reward');
+                const oldHint = this.ui.victoryModal.querySelector('.victory-key-hint');
+                if (oldReward) oldReward.remove();
+                if (oldHint) oldHint.remove();
+                
+                // Insertar nueva recompensa
+                memoryTitle.insertAdjacentHTML('afterend', keyRewardHTML);
+            }
             
             this.ui.victoryModal.classList.remove('hidden');
         }, 2500);
