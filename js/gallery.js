@@ -1,11 +1,6 @@
 // ==========================================
-// 🖼️ GALERÍA CON SISTEMA DE DESBLOQUEO
+// 🖼️ GALERÍA CON SISTEMA DE DESBLOQUEO (CORREGIDO)
 // ==========================================
-
-const galleryGrid = document.getElementById('gallery-grid');
-const galleryCounter = document.getElementById('gallery-counter');
-const galleryScreen = document.getElementById('gallery-screen');
-const ptrIndicator = document.getElementById('ptr-indicator');
 
 // Cache global de imágenes
 window.imageCache = {};
@@ -39,85 +34,122 @@ const imgObserver = new IntersectionObserver((entries, observer) => {
 // 🔒 SISTEMA DE DESBLOQUEO PROGRESIVO
 // ==========================================
 function isLevelUnlocked(levelIndex) {
-    // El primer nivel siempre está desbloqueado
     if (levelIndex === 0) return true;
-    
-    // Para desbloquear un nivel, el anterior debe estar completado
     const previousLevelId = niveles[levelIndex - 1].id;
     return localStorage.getItem('completed_' + previousLevelId) === 'true';
 }
 
 function getFirstUncompletedLevel() {
-    // Buscar el primer nivel que no esté completado
     for (let i = 0; i < niveles.length; i++) {
         const isDone = localStorage.getItem('completed_' + niveles[i].id) === 'true';
-        if (!isDone) {
-            return i;
-        }
+        if (!isDone) return i;
     }
-    // Si todos están completados, devolver el primero
     return 0;
 }
 
 function renderGallery() {
-    const grid = document.getElementById('levels-grid');
-    if (!grid) return;
+    // CORRECCIÓN CRÍTICA: El ID correcto es 'gallery-grid', no 'levels-grid'
+    const grid = document.getElementById('gallery-grid');
+    
+    if (!grid) {
+        console.error("❌ Error: No se encontró el elemento #gallery-grid");
+        return;
+    }
+    
     grid.innerHTML = ''; // Limpiar grid
 
-    // Ordenar niveles por el campo 'orden'
-    const nivelesOrdenados = [...window.niveles].sort((a, b) => a.orden - b.orden);
+    // Asegurarse de que existen niveles cargados
+    if (!window.niveles) {
+        console.warn("⚠️ No se encontraron niveles en window.niveles");
+        return;
+    }
 
-    nivelesOrdenados.forEach(nivel => {
-        const isCompleted = Sync.isLevelCompleted(nivel.id);
+    // Ordenar niveles por el campo 'orden' si existe, o usar el orden del array
+    const nivelesOrdenados = [...window.niveles]; // Asumiendo que ya vienen en orden en data.js
+
+    nivelesOrdenados.forEach((nivel, index) => {
+        // Usar Sync si existe, sino fallback a localStorage
+        const isCompleted = (typeof Sync !== 'undefined' && Sync.isLevelCompleted) 
+                            ? Sync.isLevelCompleted(nivel.id) 
+                            : localStorage.getItem('completed_' + nivel.id) === 'true';
+                            
+        // Comprobar si está desbloqueado (el anterior completado)
+        let isUnlocked = true;
+        if (index > 0) {
+            const prevId = nivelesOrdenados[index - 1].id;
+            const prevCompleted = localStorage.getItem('completed_' + prevId) === 'true';
+            if (!prevCompleted) isUnlocked = false;
+        }
+
         const item = document.createElement('div');
-        item.className = 'gallery-item level-card';
+        // APLICAMOS LAS DOS CLASES: gallery-item (estilo base) y level-card (lógica)
+        item.className = 'gallery-item level-card'; 
         
-        // --- CAMBIO PRINCIPAL AQUÍ ---
         const imgContainer = document.createElement('div');
         imgContainer.className = 'level-img-container';
-        // Usamos un div contenedor para controlar mejor la posición del overlay
 
         const img = document.createElement('img');
         img.alt = nivel.nombre;
 
         if (isCompleted) {
-            // CASO 1: Completado (Muestra la solución a color)
-            item.classList.add('completed');
+            // CASO 1: Completado
+            item.classList.add('completed', 'unlocked');
             img.src = nivel.solucion;
-            img.className = 'level-img-solved'; // Clase normal
+            img.className = 'level-img-solved';
             imgContainer.appendChild(img);
             item.onclick = () => showSolucion(nivel);
+        } else if (isUnlocked) {
+            // CASO 2: Desbloqueado pero no completado (JUGABLE)
+            item.classList.add('unlocked');
+            img.src = nivel.lineas; // Muestra líneas limpias
+            img.className = 'level-img-solved'; // Usamos clase normal para que se vea bien
+            imgContainer.appendChild(img);
+            item.onclick = () => startGame(nivel.id);
         } else {
-            // CASO 2: Bloqueado (Muestra líneas borrosas + candado)
+            // CASO 3: Bloqueado (CANDADO)
             item.classList.add('locked');
-            img.src = nivel.lineas; // Mostramos el dibujo de líneas
-            img.className = 'level-img-locked'; // Aplicamos el blur CSS
+            img.src = nivel.lineas;
+            img.className = 'level-img-locked'; // Clase con blur
 
-            // Creamos el overlay del candado
             const padlockOverlay = document.createElement('div');
             padlockOverlay.className = 'padlock-overlay';
-            padlockOverlay.innerHTML = '🔒';
+            padlockOverlay.innerHTML = '<span class="lock-icon">🔒</span>'; // Añadido span para animación
 
-            // Montamos la estructura: contenedor > imagen + overlay
             imgContainer.appendChild(img);
             imgContainer.appendChild(padlockOverlay);
             
-            // Al hacer click, inicia el juego
-            item.onclick = () => startGame(nivel.id);
+            item.onclick = () => showLockedMessage(index);
         }
-        // -----------------------------
 
         const title = document.createElement('div');
-        title.className = 'level-title';
-        // Si está bloqueado, usamos un nombre genérico, si no, el real
-        title.textContent = isCompleted ? nivel.nombre : `Nivel ${nivel.orden + 1}`;
+        title.className = 'level-title thumb-title'; // Añadida thumb-title para asegurar estilo
+        title.textContent = isCompleted ? nivel.nombre : `Nivel ${index + 1}`;
         
-        // Añadimos el contenedor de imagen en vez de la imagen suelta
         item.appendChild(imgContainer); 
         item.appendChild(title);
+        
+        // Añadir badge de completado si corresponde
+        if (isCompleted) {
+            const badge = document.createElement('div');
+            badge.className = 'check-badge';
+            badge.innerHTML = '✓';
+            item.appendChild(badge);
+        }
+
         grid.appendChild(item);
     });
 }
+
+// Funciones auxiliares necesarias para que los onclick funcionen
+window.startGame = function(id) {
+    if (typeof Game !== 'undefined') Game.loadLevel(niveles.findIndex(n => n.id === id));
+};
+
+window.showSolucion = function(nivel) {
+    // Si quieres que al hacer clic en uno completado solo se vea la imagen grande,
+    // o volver a jugar. Por defecto reabrimos el juego en modo victoria.
+    startGame(nivel.id);
+};
 
 // ==========================================
 // 💬 MENSAJE DE NIVEL BLOQUEADO
@@ -126,128 +158,67 @@ function showLockedMessage(levelIndex) {
     const previousLevel = niveles[levelIndex - 1];
     const currentLevel = niveles[levelIndex];
     
-    // Vibración de feedback
     if (navigator.vibrate) navigator.vibrate(200);
     
-    // Crear modal temporal
     const modal = document.createElement('div');
     modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        z-index: 9999;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.6); z-index: 9999;
+        display: flex; justify-content: center; align-items: center;
         animation: fadeIn 0.2s;
     `;
     
     modal.innerHTML = `
-        <div style="
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 320px;
-            text-align: center;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            animation: popIn 0.3s;
-        ">
-            <div style="font-size: 60px; margin-bottom: 15px;">🔒</div>
-            <h3 style="color: #d63384; margin: 0 0 10px 0; font-size: 1.3rem;">Recuerdo Bloqueado</h3>
-            <p style="color: #666; margin: 0 0 20px 0; line-height: 1.5;">
-                Para desbloquear <strong>"${currentLevel.nombre}"</strong>, 
-                primero debes completar <strong>"${previousLevel.nombre}"</strong>.
+        <div style="background: white; border-radius: 20px; padding: 30px; max-width: 300px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3); animation: popIn 0.3s;">
+            <div style="font-size: 50px; margin-bottom: 15px;">🔒</div>
+            <h3 style="color: #d63384; margin: 0 0 10px 0;">Nivel Bloqueado</h3>
+            <p style="color: #666; margin-bottom: 20px; font-size: 0.9rem;">
+                Completa el <strong>Nivel ${levelIndex}</strong> para desbloquear este dibujo.
             </p>
-            <button onclick="this.parentElement.parentElement.remove()" style="
-                background: #d63384;
-                color: white;
-                border: none;
-                padding: 12px 30px;
-                border-radius: 25px;
-                font-size: 1rem;
-                font-weight: 600;
-                cursor: pointer;
-                box-shadow: 0 4px 10px rgba(214, 51, 132, 0.3);
-            ">
-                Entendido
-            </button>
+            <button class="confirm-btn ok" style="padding: 10px 30px;">Entendido</button>
         </div>
     `;
     
-    // Cerrar al hacer click fuera
-    modal.onclick = (e) => {
-        if (e.target === modal) modal.remove();
-    };
-    
+    modal.onclick = () => modal.remove();
     document.body.appendChild(modal);
-    
-    // Auto-cerrar después de 5 segundos
-    setTimeout(() => {
-        if (modal.parentElement) modal.remove();
-    }, 5000);
 }
 
 // ==========================================
-// 🔄 PULL TO REFRESH (PTR)
+// 🔄 PULL TO REFRESH & UTILS
 // ==========================================
+const galleryScreenEl = document.getElementById('gallery-screen');
+const ptrIndicatorEl = document.getElementById('ptr-indicator');
 let ptrStartY = 0, ptrDist = 0;
 
-galleryScreen.addEventListener('touchstart', e => { 
-    if (galleryScreen.scrollTop === 0) ptrStartY = e.touches[0].clientY; 
-}, { passive: true });
+if (galleryScreenEl) {
+    galleryScreenEl.addEventListener('touchstart', e => { 
+        if (galleryScreenEl.scrollTop === 0) ptrStartY = e.touches[0].clientY; 
+    }, { passive: true });
 
-galleryScreen.addEventListener('touchmove', e => {
-    if (!ptrStartY) return;
-    
-    const y = e.touches[0].clientY;
-    if (y > ptrStartY && galleryScreen.scrollTop === 0) {
-        ptrDist = y - ptrStartY;
-        if (ptrDist > 60) {
-            ptrIndicator.style.height = '50px';
+    galleryScreenEl.addEventListener('touchmove', e => {
+        if (!ptrStartY) return;
+        const y = e.touches[0].clientY;
+        if (y > ptrStartY && galleryScreenEl.scrollTop === 0) {
+            ptrDist = y - ptrStartY;
+            if (ptrDist > 60 && ptrIndicatorEl) ptrIndicatorEl.style.height = '50px';
         }
-    }
-}, { passive: true });
+    }, { passive: true });
 
-galleryScreen.addEventListener('touchend', () => {
-    if (ptrDist > 60 && galleryScreen.scrollTop === 0) {
-        ptrIndicator.innerText = "🔄 Cargando...";
-        setTimeout(() => location.reload(), 300);
-    } else { 
-        ptrIndicator.style.height = '0px'; 
-    }
-    ptrStartY = 0; 
-    ptrDist = 0;
-});
-
-// ==========================================
-// 🔊 SONIDO
-// ==========================================
-const btnSoundGal = document.getElementById('btn-sound-gallery');
-if(btnSoundGal) {
-    btnSoundGal.onclick = () => {
-        if(typeof toggleSound === 'function') toggleSound();
-        if(typeof updateSoundState === 'function') updateSoundState(false);
-    };
-    if(typeof updateSoundState === 'function') updateSoundState(false);
+    galleryScreenEl.addEventListener('touchend', () => {
+        if (ptrDist > 60 && galleryScreenEl.scrollTop === 0) {
+            if(ptrIndicatorEl) ptrIndicatorEl.innerText = "🔄 Cargando...";
+            setTimeout(() => location.reload(), 300);
+        } else if (ptrIndicatorEl) { 
+            ptrIndicatorEl.style.height = '0px'; 
+        }
+        ptrStartY = 0; ptrDist = 0;
+    });
 }
 
-// ==========================================
-// 🚀 INICIALIZACIÓN
-// ==========================================
-initDB().then(() => { 
-    renderGallery(); 
-});
-
-// NUEVO: Optimización de scroll en la galería
-let scrollTimeout;
-galleryScreen.addEventListener('scroll', () => {
-    document.body.classList.add('scrolling');
-    
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-        document.body.classList.remove('scrolling');
-    }, 150);
-}, { passive: true });
+// Inicialización
+if (typeof initDB === 'function') {
+    initDB().then(() => renderGallery());
+} else {
+    // Fallback si db.js no cargó
+    document.addEventListener('DOMContentLoaded', renderGallery);
+}
