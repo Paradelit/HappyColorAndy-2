@@ -17,7 +17,9 @@ const Game = {
         initialPixels: [],
         
         lastTransformUpdate: 0,
-        transformThrottle: 16 // ~60fps
+        transformThrottle: 16,
+
+        spoilerAccepted: false
     },
 
     input: { lX: 0, lY: 0, initDist: 0, lZoomT: 0 },
@@ -29,7 +31,9 @@ const Game = {
         backupImg: null,
         idleTimer: null,
         pendingAction: null,
-        lastHighlightIndex: -1
+        lastHighlightIndex: -1,
+        fillAnimFrame: null,     
+        progressAnimFrame: null
     },
 
     assets: { imgLineas: new Image(), imgSolucion: new Image() },
@@ -131,9 +135,6 @@ const Game = {
         }
     },
 
-    // ==========================================
-    // ðŸŽ¨ PINTADO FLUIDO PROGRESIVO (NUEVO)
-    // ==========================================
     animateFillFluid2: function(indices, color) {
         if (!indices || indices.length === 0) {
             this.state.isProcessing = false;
@@ -144,13 +145,10 @@ const Game = {
         const h = this.ui.canvas.height;
         const total = indices.length;
         
-        // Obtener las coordenadas del punto de inicio (primer Ã­ndice)
         const startIdx = indices[0];
         const startX = startIdx % w;
         const startY = Math.floor(startIdx / w);
         
-        // Ordenar pÃ­xeles por distancia euclidiana desde el punto de inicio
-        // Esto crea el efecto de "expansiÃ³n" desde el punto clickeado
         const sortedIndices = Array.from(indices).sort((a, b) => {
             const ax = a % w, ay = Math.floor(a / w);
             const bx = b % w, by = Math.floor(b / w);
@@ -159,7 +157,6 @@ const Game = {
             return distA - distB;
         });
 
-        // Preparar ImageData
         const imgData = this.ctx.getImageData(0, 0, w, h);
         const data = imgData.data;
         const linesImgData = this.lineDrawCtx.getImageData(0, 0, w, h);
@@ -167,35 +164,27 @@ const Game = {
 
         const r = color.r, g = color.g, b = color.b;
 
-        // Detectar mÃ³vil
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         
-        // NUEVA LÃ“GICA: Ajustar velocidad segÃºn tamaÃ±o del Ã¡rea
-        let duration; // DuraciÃ³n total en ms
-        let framesPerUpdate; // CuÃ¡ntos frames esperar entre cada actualizaciÃ³n visual
+        let duration; 
+        let framesPerUpdate;
         
         if (total < 50) {
-            // Ãrea muy pequeÃ±a: casi instantÃ¡neo pero visible
             duration = 80;
             framesPerUpdate = 1;
         } else if (total < 500) {
-            // Ãrea pequeÃ±a: rÃ¡pido
             duration = 150;
             framesPerUpdate = 1;
         } else if (total < 2000) {
-            // Ãrea mediana: moderado
             duration = 250;
             framesPerUpdate = 1;
         } else if (total < 5000) {
-            // Ãrea grande: mÃ¡s lento
             duration = 400;
             framesPerUpdate = isMobile ? 2 : 1;
         } else if (total < 15000) {
-            // Ãrea muy grande: lento pero fluido
             duration = 600;
             framesPerUpdate = isMobile ? 3 : 2;
         } else {
-            // Ãrea masiva: lo mÃ¡s fluido posible sin congelar
             duration = 800;
             framesPerUpdate = isMobile ? 4 : 3;
         }
@@ -209,10 +198,8 @@ const Game = {
             const elapsed = performance.now() - startTime;
             const progress = Math.min(elapsed / duration, 1);
             
-            // Calcular cuÃ¡ntos pÃ­xeles deberÃ­amos haber pintado hasta ahora
             const targetIndex = Math.floor(progress * total);
             
-            // Pintar los pÃ­xeles que faltan hasta el objetivo
             while (currentIndex < targetIndex) {
                 const idx = sortedIndices[currentIndex] * 4;
                 data[idx] = r; 
@@ -223,7 +210,6 @@ const Game = {
                 currentIndex++;
             }
 
-            // Actualizar canvas segÃºn la frecuencia determinada
             frameCount++;
             if (frameCount >= framesPerUpdate || progress >= 1) {
                 this.ctx.putImageData(imgData, 0, 0);
@@ -232,9 +218,8 @@ const Game = {
             }
 
             if (progress < 1) {
-                requestAnimationFrame(loop);
+                this.cache.fillAnimFrame = requestAnimationFrame(loop);
             } else {
-                // Asegurar que todo estÃ¡ pintado y renderizado
                 while (currentIndex < total) {
                     const idx = sortedIndices[currentIndex] * 4;
                     data[idx] = r; 
@@ -246,11 +231,12 @@ const Game = {
                 }
                 this.ctx.putImageData(imgData, 0, 0);
                 this.lineDrawCtx.putImageData(linesImgData, 0, 0);
+                this.cache.fillAnimFrame = null; 
                 this.finishPaintOperation(total);
             }
         };
         
-        requestAnimationFrame(loop);
+        this.cache.fillAnimFrame = requestAnimationFrame(loop);
     },
 
     animateFillFluid: function(indices, color) {
@@ -262,8 +248,6 @@ const Game = {
         const w = this.ui.canvas.width;
         const h = this.ui.canvas.height;
         
-        // 1. CALCULAR CAJA DELIMITADORA (LÃ­mites del Ã¡rea a pintar)
-        // Evita manipular toda la pantalla gigante si solo pintamos una zona
         let minX = w, maxX = 0, minY = h, maxY = 0;
         
         for(let i = 0; i < indices.length; i++) {
@@ -276,7 +260,6 @@ const Game = {
             if(y > maxY) maxY = y;
         }
 
-        // AÃ±adir margen de seguridad de 2px
         minX = Math.max(0, minX - 2);
         minY = Math.max(0, minY - 2);
         maxX = Math.min(w - 1, maxX + 2);
@@ -293,7 +276,6 @@ const Game = {
 
         const r = color.r, g = color.g, b = color.b;
 
-        // Mapear Ã­ndices globales a locales dentro de la caja
         const localIndices = [];
         const startIdx = indices[0];
         const startX = startIdx % w; 
@@ -304,9 +286,7 @@ const Game = {
             const gx = idx % w;
             const gy = (idx - gx) / w;
             
-            // Distancia para efecto visual (aprox)
             const dist = (gx - startX)**2 + (gy - startY)**2;          
-            // Ãndice local
             const lx = gx - minX;
             const ly = gy - minY;
             localIndices.push({ 
@@ -315,11 +295,9 @@ const Game = {
             });
         }
         
-        // Ordenar para efecto de expansiÃ³n
         localIndices.sort((a, b) => a.dist - b.dist);
 
         const total = localIndices.length;
-        // Ajustar velocidad: imÃ¡genes grandes necesitan ser mÃ¡s rÃ¡pidas por frame
         const duration = total < 1000 ? 200 : 400; 
         
         const startTime = performance.now();
@@ -332,28 +310,27 @@ const Game = {
             
             const targetIndex = Math.floor(progress * total);
             
-            // Pintar lote
             while (currentIndex < targetIndex) {
                 const p = localIndices[currentIndex];
                 const idx = p.lIdx;
                 
                 data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
-                lData[idx+3] = 0; // Borrar lÃ­nea negra en esa zona
+                lData[idx+3] = 0;
                 currentIndex++;
             }
 
-            // Poner el trozo modificado en su sitio
             this.ctx.putImageData(imgData, minX, minY);
             this.lineDrawCtx.putImageData(linesImgData, minX, minY);
 
             if (progress < 1) {
-                requestAnimationFrame(loop);
+                this.cache.fillAnimFrame = requestAnimationFrame(loop);
             } else {
+                this.cache.fillAnimFrame = null; 
                 this.finishPaintOperation(total);
             }
         };
         
-        requestAnimationFrame(loop);
+        this.cache.fillAnimFrame = requestAnimationFrame(loop);
     },
 
 
@@ -433,6 +410,25 @@ const Game = {
 
         const startPeek = (e) => {
             if(e.cancelable) e.preventDefault();
+
+            // --- BLOQUE DE PROTECCIÓN ANTI-SPOILER ---
+            // Si el juego NO ha terminado Y aún no has aceptado el spoiler...
+            if (!this.state.isVictoryShown && !this.state.spoilerAccepted) {
+                // Soltamos el evento actual para que no se quede "enganchado"
+                
+                const confirmar = confirm(
+                    "🫣 ALERTA DE SPOILER\n\n" +
+                    "Estás a punto de ver la imagen final completa.\n" +
+                    "¿Seguro que quieres verla ahora?"
+                );
+
+                if (confirmar) {
+                    this.state.spoilerAccepted = true; // Ya no preguntamos más en este nivel
+                } else {
+                    return; // Si cancela, no mostramos nada
+                }
+            }
+
             if(this.cache.backupImg) return;
             
             this.cache.backupImg = this.ctx.getImageData(0,0, this.ui.canvas.width, this.ui.canvas.height); 
@@ -523,6 +519,9 @@ const Game = {
 
         const level = niveles[index];
         this.state.currentLevel = level;
+
+        this.state.spoilerAccepted = false;
+
         const isDone = localStorage.getItem('completed_' + level.id) === 'true';
         this.ui.title.innerText = isDone ? level.nombreCompleto : level.nombre;
 
@@ -943,9 +942,10 @@ const Game = {
     queueProgressUpdate: function() {
         if (this.state.progressUpdateQueued) return;
         this.state.progressUpdateQueued = true;
-        requestAnimationFrame(() => {
+        this.cache.progressAnimFrame = requestAnimationFrame(() => {
             this.updateProgress();
             this.state.progressUpdateQueued = false;
+            this.cache.progressAnimFrame = null; // Limpieza tras ejecución
         });
     },
 
@@ -1051,6 +1051,18 @@ const Game = {
         if(typeof bgMusic !== 'undefined') {
             bgMusic.pause();
             bgMusic.currentTime = 0;
+        }
+
+        // 1. Cancelar animación de pintado si existe
+        if (this.cache.fillAnimFrame) {
+            cancelAnimationFrame(this.cache.fillAnimFrame);
+            this.cache.fillAnimFrame = null;
+        }
+        
+        // 2. Cancelar actualización de progreso si existe
+        if (this.cache.progressAnimFrame) {
+            cancelAnimationFrame(this.cache.progressAnimFrame);
+            this.cache.progressAnimFrame = null;
         }
 
         if (this.worker) {

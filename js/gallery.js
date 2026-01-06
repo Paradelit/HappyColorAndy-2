@@ -59,115 +59,64 @@ function getFirstUncompletedLevel() {
     return 0;
 }
 
-async function renderGallery() {
-    const fragment = document.createDocumentFragment();
-    let completedCount = 0;
-    let unlockedCount = 0;
+function renderGallery() {
+    const grid = document.getElementById('levels-grid');
+    if (!grid) return;
+    grid.innerHTML = ''; // Limpiar grid
 
-    for (let i = 0; i < niveles.length; i++) {
-        const nivel = niveles[i];
-        const el = document.createElement('div');
+    // Ordenar niveles por el campo 'orden'
+    const nivelesOrdenados = [...window.niveles].sort((a, b) => a.orden - b.orden);
+
+    nivelesOrdenados.forEach(nivel => {
+        const isCompleted = Sync.isLevelCompleted(nivel.id);
+        const item = document.createElement('div');
+        item.className = 'level-card';
         
-        const isUnlocked = isLevelUnlocked(i);
-        const isDone = localStorage.getItem('completed_' + nivel.id) === 'true';
+        // --- CAMBIO PRINCIPAL AQUÍ ---
+        const imgContainer = document.createElement('div');
+        imgContainer.className = 'level-img-container';
+        // Usamos un div contenedor para controlar mejor la posición del overlay
 
-        const displayName = isDone ? nivel.nombreCompleto : nivel.nombre;        
-        
-        if (isDone) completedCount++;
-        if (isUnlocked) unlockedCount++;
+        const img = document.createElement('img');
+        img.alt = nivel.nombre;
 
-        if (!isUnlocked) {
-            el.className = 'gallery-item locked';
-            el.innerHTML = `
-                <div class="thumb-wrapper locked-wrapper" style="background: #e0e0e0; height: 160px; display:flex; flex-direction: column; align-items:center; justify-content:center; position: relative;">
-                    <div class="lock-overlay">
-                        <div class="lock-icon">🔒</div>
-                        <div class="lock-text">Bloqueado</div>
-                        <div class="unlock-hint">Completa "${niveles[i-1].nombre}"</div>
-                    </div>
-                </div>
-                <div class="thumb-title" style="color: #999;">${displayName}</div>
-            `;
-            
-            el.onclick = () => {
-                showLockedMessage(i);
-            };
-            
+        if (isCompleted) {
+            // CASO 1: Completado (Muestra la solución a color)
+            item.classList.add('completed');
+            img.src = nivel.solucion;
+            img.className = 'level-img-solved'; // Clase normal
+            imgContainer.appendChild(img);
+            item.onclick = () => showSolucion(nivel);
         } else {
-            el.className = 'gallery-item unlocked';
-            
-            const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-            
-            el.innerHTML = `
-                <div class="thumb-wrapper" style="background: #f5f5f5; height: 160px; display:flex; align-items:center; justify-content:center; position: relative;">
-                    <img data-src="" class="thumb-preview lazy-loading" 
-                         src="${placeholder}" 
-                         alt="${displayName}"
-                         style="width:100%; height:100%; object-fit:contain; transition: opacity 0.3s; opacity: 0;"
-                         onload="this.style.opacity=1">
-                </div>
-                ${isDone ? '<div class="check-badge">✓</div>' : '<div class="progress-badge">🎨</div>'}
-                <div class="thumb-title">${displayName}</div>
-            `;
-            
-            const imgEl = el.querySelector('.lazy-loading');
-            
-            if (isDone) {
-                // Si ya está completado, usamos la imagen de solución original (HD)
-                // en lugar de la captura del canvas guardada.
-                imgEl.setAttribute('data-src', nivel.solucion);
-                imgObserver.observe(imgEl);
-            } else {
-                // Si está en progreso, buscamos en la DB o ponemos las líneas
-                loadFromDB(nivel.id).then(savedImg => {
-                    const imgSrc = savedImg || nivel.lineas;
-                    imgEl.setAttribute('data-src', imgSrc);
-                    imgObserver.observe(imgEl);
-                });
-            }
-            
-            // Click handler para nivel desbloqueado
-            el.onclick = () => Game.loadLevel(i);
-        }
-        
-        fragment.appendChild(el);
-    }
-    
-    // Actualizar DOM
-    galleryGrid.innerHTML = '';
-    galleryGrid.appendChild(fragment);
-    
-    // Actualizar contador con información de desbloqueados
-    galleryCounter.innerHTML = `
-        <div style="display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap;">
-            <span>✅ Completados: ${completedCount}/${niveles.length}</span>
-            <span>🔓 Desbloqueados: ${unlockedCount}/${niveles.length}</span>
-        </div>
-    `;
-    
-    // Observar imágenes lazy
-    requestAnimationFrame(() => {
-        document.querySelectorAll('.lazy-loading').forEach(img => {
-            if (img.getAttribute('data-src')) {
-                imgObserver.observe(img);
-            }
-        });
-    });
+            // CASO 2: Bloqueado (Muestra líneas borrosas + candado)
+            item.classList.add('locked');
+            img.src = nivel.lineas; // Mostramos el dibujo de líneas
+            img.className = 'level-img-locked'; // Aplicamos el blur CSS
 
-    const nextLevelIdx = getFirstUncompletedLevel();
-    if (niveles[nextLevelIdx]) {
-        const nextLevel = niveles[nextLevelIdx];
+            // Creamos el overlay del candado
+            const padlockOverlay = document.createElement('div');
+            padlockOverlay.className = 'padlock-overlay';
+            padlockOverlay.innerHTML = '🔒';
+
+            // Montamos la estructura: contenedor > imagen + overlay
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(padlockOverlay);
+            
+            // Al hacer click, inicia el juego
+            item.onclick = () => startGame(nivel.id);
+        }
+        // -----------------------------
+
+        const title = document.createElement('div');
+        title.className = 'level-title';
+        // Si está bloqueado, usamos un nombre genérico, si no, el real
+        title.textContent = isCompleted ? nivel.nombre : `Nivel ${nivel.orden + 1}`;
         
-        // Precargar líneas
-        const imgL = new Image();
-        imgL.src = nextLevel.lineas;
-        window.imageCache[nextLevel.lineas] = imgL;
-        
-        // Precargar solución
-        const imgS = new Image();
-        imgS.src = nextLevel.solucion;
-        window.imageCache[nextLevel.solucion] = imgS;
-    }
+        // Añadimos el contenedor de imagen en vez de la imagen suelta
+        item.appendChild(imgContainer); 
+        item.appendChild(title);
+        grid.appendChild(item);
+    });
 }
 
 // ==========================================
