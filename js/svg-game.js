@@ -1,0 +1,381 @@
+// ==========================================
+// 🎨 SVG-GAME.JS — Renderizador color-by-number vectorial (PoC)
+// ==========================================
+// Cada region es un <path> tappable: zoom infinito y numeros nitidos.
+// Reusa los patrones de pan/zoom y de paleta del juego raster (js/game.js)
+// pero NO usa flood-fill ni worker: la unidad es la region SVG.
+
+const SvgGame = {
+  ui: {},
+  doc: null,
+  state: {
+    scale: 1, pX: 0, pY: 0,
+    isDrag: false, hasMov: false,
+    selectedColor: -1,
+    paintedCount: 0, totalRegions: 0,
+    lastTransformUpdate: 0, transformThrottle: 16,
+  },
+  // por indice de paleta: cuantas regiones quedan / total
+  colorRemaining: [], colorTotal: [],
+  input: { lX: 0, lY: 0, initDist: 0, lZoomT: 0 },
+
+  // ---------- arranque ----------
+  init() {
+    this.ui = {
+      uploadView: document.getElementById('upload-view'),
+      gameView: document.getElementById('game-view'),
+      drop: document.getElementById('drop'),
+      file: document.getElementById('file'),
+      thumb: document.getElementById('preview-thumb'),
+      generate: document.getElementById('generate'),
+      err: document.getElementById('err'),
+      backendUrl: document.getElementById('backend-url'),
+      loading: document.getElementById('loading-overlay'),
+      loadingText: document.getElementById('loading-text'),
+      viewport: document.getElementById('viewport'),
+      shakeLayer: document.getElementById('shake-layer'),
+      zoomLayer: document.getElementById('zoom-layer'),
+      svg: document.getElementById('svg-canvas'),
+      paleta: document.getElementById('paleta'),
+      progressBar: document.getElementById('progress-bar'),
+      progressPct: document.getElementById('progress-pct'),
+      victory: document.getElementById('victory'),
+    };
+    this.bindUpload();
+    this.bindCanvas();
+  },
+
+  // ---------- vista de subida ----------
+  bindUpload() {
+    const u = this.ui;
+    u.drop.onclick = () => u.file.click();
+    u.file.onchange = () => this.onFilePicked();
+
+    ['dragover', 'dragenter'].forEach(ev =>
+      u.drop.addEventListener(ev, e => { e.preventDefault(); u.drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev =>
+      u.drop.addEventListener(ev, e => { e.preventDefault(); u.drop.classList.remove('over'); }));
+    u.drop.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) { u.file.files = e.dataTransfer.files; this.onFilePicked(); }
+    });
+
+    // sliders -> etiquetas
+    const bind = (id, fn) => { const el = document.getElementById(id); el.oninput = fn; fn(); };
+    bind('n_colors', () => document.getElementById('v-colors').textContent = document.getElementById('n_colors').value);
+    bind('min_area', () => document.getElementById('v-area').textContent =
+      (document.getElementById('min_area').value / 100).toFixed(2) + '%');
+    bind('simplify', () => document.getElementById('v-tol').textContent =
+      (document.getElementById('simplify').value / 10).toFixed(1));
+
+    u.generate.onclick = () => this.generate();
+  },
+
+  onFilePicked() {
+    const f = this.ui.file.files[0];
+    if (!f) return;
+    this.ui.thumb.src = URL.createObjectURL(f);
+    this.ui.thumb.style.display = 'block';
+    this.ui.generate.disabled = false;
+    this.ui.err.textContent = '';
+  },
+
+  async generate() {
+    const f = this.ui.file.files[0];
+    if (!f) return;
+    const base = this.ui.backendUrl.value.replace(/\/$/, '');
+
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('n_colors', document.getElementById('n_colors').value);
+    fd.append('min_area_pct', (document.getElementById('min_area').value / 100).toString());
+    fd.append('simplify_tol', (document.getElementById('simplify').value / 10).toString());
+
+    this.ui.err.textContent = '';
+    this.ui.loading.style.display = 'flex';
+    try {
+      const res = await fetch(base + '/generate', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error('HTTP ' + res.status + ' · ' + t.slice(0, 160));
+      }
+      const doc = await res.json();
+      this.loadDoc(doc);
+    } catch (e) {
+      this.ui.err.textContent = 'No se pudo generar: ' + e.message +
+        ' — ¿está el backend en marcha y la URL es correcta?';
+    } finally {
+      this.ui.loading.style.display = 'none';
+    }
+  },
+
+  // ---------- carga del documento y construccion del SVG ----------
+  loadDoc(doc) {
+    this.doc = doc;
+    const n = doc.palette.length;
+    this.colorRemaining = new Array(n).fill(0);
+    this.colorTotal = new Array(n).fill(0);
+    this.state.paintedCount = 0;
+    this.state.totalRegions = doc.regions.length;
+
+    this.buildSvg();
+    this.generarPaletaUI();
+
+    this.ui.uploadView.style.display = 'none';
+    this.ui.gameView.style.display = 'flex';
+    this.fitCamera(doc.width, doc.height);
+    this.selectFirstAvailable();
+    this.updateProgress();
+  },
+
+  buildSvg() {
+    const { width, height, regions, palette } = this.doc;
+    const svg = this.ui.svg;
+    const SVGNS = 'http://www.w3.org/2000/svg';
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.classList.remove('revealed');
+    svg.innerHTML = '';
+
+    const paths = document.createElementNS(SVGNS, 'g');
+    const labels = document.createElementNS(SVGNS, 'g');
+
+    regions.forEach(r => {
+      const p = document.createElementNS(SVGNS, 'path');
+      p.setAttribute('d', r.d);
+      p.setAttribute('fill-rule', 'evenodd');
+      p.setAttribute('vector-effect', 'non-scaling-stroke'); // bordes finos a cualquier zoom
+      p.setAttribute('class', 'region');
+      p.dataset.id = r.id;
+      p.dataset.color = r.color;
+      p.addEventListener('click', () => this.onRegionClick(r, p));
+      paths.appendChild(p);
+      this.colorTotal[r.color]++;
+      this.colorRemaining[r.color]++;
+
+      if (r.label) {
+        const t = document.createElementNS(SVGNS, 'text');
+        t.setAttribute('x', r.label.x);
+        t.setAttribute('y', r.label.y);
+        t.setAttribute('font-size', r.label.size);
+        t.setAttribute('class', 'rlabel');
+        t.textContent = (r.color + 1);
+        labels.appendChild(t);
+      }
+    });
+
+    svg.appendChild(paths);
+    svg.appendChild(labels);
+  },
+
+  // ---------- pintado por region ----------
+  onRegionClick(r, pathEl) {
+    if (this.state.hasMov) return;            // fue arrastre/pinch, no pintar
+    if (pathEl.classList.contains('painted')) return;
+    if (r.color !== this.state.selectedColor) { this.shake(); return; }
+
+    const hex = this.doc.palette[r.color].hex;
+    pathEl.setAttribute('fill', hex);
+    pathEl.classList.add('painted');
+    this.state.paintedCount++;
+    this.colorRemaining[r.color]--;
+    this.updateColorBtn(r.color);
+    this.updateProgress();
+    this.vibrate(30);
+
+    if (this.colorRemaining[r.color] === 0) this.onColorCompleted(r.color);
+    if (this.state.paintedCount === this.state.totalRegions) this.triggerVictory();
+  },
+
+  shake() {
+    const sl = this.ui.shakeLayer;
+    sl.classList.add('shake');
+    this.vibrate(120);
+    setTimeout(() => sl.classList.remove('shake'), 300);
+  },
+
+  vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); },
+
+  // ---------- paleta (reusa patron de game.js) ----------
+  generarPaletaUI() {
+    const pal = this.ui.paleta;
+    pal.innerHTML = '';
+    this.doc.palette.forEach((c, i) => {
+      const { r, g, b } = this.hexToRgb(c.hex);
+      const btn = document.createElement('div');
+      btn.className = 'color-btn';
+      btn.id = 'cbtn-' + i;
+      btn.style.setProperty('--btn-color', c.hex);
+      const isLight = (r * 0.299 + g * 0.587 + b * 0.114) > 186;
+      btn.innerHTML = `<span class="color-number" style="color:${isLight ? '#333' : '#fff'}">${i + 1}</span>`;
+      btn.onclick = () => { if (this.colorRemaining[i] > 0) this.selectColor(i); };
+      pal.appendChild(btn);
+      this.updateColorBtn(i);
+    });
+  },
+
+  updateColorBtn(i) {
+    const btn = document.getElementById('cbtn-' + i);
+    if (!btn) return;
+    const total = this.colorTotal[i] || 1;
+    const rem = this.colorRemaining[i];
+    if (rem <= 0) {
+      btn.classList.add('completed');
+      btn.classList.remove('selected');
+      btn.style.setProperty('--progress', '100%');
+    } else {
+      btn.style.setProperty('--progress', `${((total - rem) / total) * 100}%`);
+    }
+  },
+
+  selectColor(i) {
+    this.state.selectedColor = i;
+    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+    const btn = document.getElementById('cbtn-' + i);
+    if (btn) { btn.classList.add('selected'); btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }
+  },
+
+  selectFirstAvailable() {
+    for (let i = 0; i < this.colorRemaining.length; i++) {
+      if (this.colorRemaining[i] > 0) { this.selectColor(i); return; }
+    }
+  },
+
+  onColorCompleted(index) {
+    this.vibrate([40, 40, 40]);
+    // avanzar al siguiente color con regiones pendientes (envuelve)
+    const n = this.colorRemaining.length;
+    for (let k = 1; k <= n; k++) {
+      const i = (index + k) % n;
+      if (this.colorRemaining[i] > 0) { setTimeout(() => this.selectColor(i), 250); return; }
+    }
+  },
+
+  updateProgress() {
+    const pct = this.state.totalRegions
+      ? Math.round((this.state.paintedCount / this.state.totalRegions) * 100) : 0;
+    this.ui.progressBar.style.width = pct + '%';
+    this.ui.progressPct.textContent = pct + '%';
+  },
+
+  triggerVictory() {
+    this.ui.svg.classList.add('revealed'); // funde lineas y numeros
+    if (typeof confetti === 'function') {
+      confetti({ particleCount: 120, spread: 80, origin: { y: .6 }, colors: ['#d63384', '#667eea', '#764ba2', '#f093fb', '#4facfe'] });
+    }
+    setTimeout(() => { this.ui.victory.style.display = 'flex'; }, 900);
+  },
+
+  // ---------- camara: pan / zoom (portado de game.js) ----------
+  hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  },
+
+  getDist(t1, t2) { return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); },
+
+  fitCamera(w, h) {
+    const vW = this.ui.viewport.clientWidth, vH = this.ui.viewport.clientHeight;
+    const sW = (vW - 40) / w, sH = (vH - 40) / h;
+    this.state.scale = Math.min(sW, sH) || 0.5;
+    this.state.pX = (vW - w * this.state.scale) / 2;
+    this.state.pY = (vH - h * this.state.scale) / 2;
+    this.updateTransform();
+  },
+
+  updateTransform() {
+    this.ui.zoomLayer.style.transform =
+      `translate(${this.state.pX}px, ${this.state.pY}px) scale(${this.state.scale})`;
+  },
+
+  updateTransformThrottled() {
+    const now = Date.now();
+    if (now - this.state.lastTransformUpdate < this.state.transformThrottle) return;
+    this.state.lastTransformUpdate = now;
+    this.updateTransform();
+  },
+
+  bindCanvas() {
+    const vp = this.ui.viewport;
+    // raton
+    vp.addEventListener('mousedown', e => { this.state.isDrag = true; this.state.hasMov = false; this.input.lX = e.clientX; this.input.lY = e.clientY; });
+    window.addEventListener('mousemove', e => {
+      if (!this.state.isDrag) return;
+      const dx = e.clientX - this.input.lX, dy = e.clientY - this.input.lY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.state.hasMov = true;
+      this.state.pX += dx; this.state.pY += dy;
+      this.input.lX = e.clientX; this.input.lY = e.clientY;
+      this.updateTransformThrottled();
+    });
+    window.addEventListener('mouseup', () => { this.state.isDrag = false; });
+    vp.addEventListener('wheel', e => this.handleWheel(e), { passive: false });
+
+    // tactil
+    vp.addEventListener('touchstart', e => this.handleTouchStart(e), { passive: false });
+    vp.addEventListener('touchmove', e => this.handleTouchMove(e), { passive: false });
+    vp.addEventListener('touchend', e => this.handleTouchEnd(e));
+
+    // botones
+    document.getElementById('back-btn').onclick = () => this.backToUpload();
+    document.getElementById('victory-close').onclick = () => { this.ui.victory.style.display = 'none'; this.backToUpload(); };
+  },
+
+  handleWheel(e) {
+    e.preventDefault();
+    const rect = this.ui.viewport.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const ns = Math.min(Math.max(0.1, this.state.scale * (e.deltaY > 0 ? 0.9 : 1.1)), 40);
+    this.state.pX = mx - (mx - this.state.pX) * (ns / this.state.scale);
+    this.state.pY = my - (my - this.state.pY) * (ns / this.state.scale);
+    this.state.scale = ns;
+    this.updateTransform();
+  },
+
+  handleTouchStart(e) {
+    if (e.touches.length === 1) {
+      this.state.isDrag = true; this.state.hasMov = false;
+      this.input.lX = e.touches[0].clientX; this.input.lY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      this.state.isDrag = false;
+      this.input.initDist = this.getDist(e.touches[0], e.touches[1]);
+      this.input.lZoomT = Date.now();
+    }
+  },
+
+  handleTouchMove(e) {
+    e.preventDefault();
+    const rect = this.ui.viewport.getBoundingClientRect();
+    if (e.touches.length === 1 && this.state.isDrag) {
+      const dx = e.touches[0].clientX - this.input.lX, dy = e.touches[0].clientY - this.input.lY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.state.hasMov = true;
+      this.state.pX += dx; this.state.pY += dy;
+      this.input.lX = e.touches[0].clientX; this.input.lY = e.touches[0].clientY;
+      this.updateTransformThrottled();
+    } else if (e.touches.length === 2) {
+      this.input.lZoomT = Date.now();
+      this.state.hasMov = true;
+      const dist = this.getDist(e.touches[0], e.touches[1]);
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      const ns = Math.min(Math.max(0.1, this.state.scale * (dist / this.input.initDist)), 40);
+      this.state.pX = midX - (midX - this.state.pX) * (ns / this.state.scale);
+      this.state.pY = midY - (midY - this.state.pY) * (ns / this.state.scale);
+      this.state.scale = ns; this.input.initDist = dist;
+      this.updateTransform();
+    }
+  },
+
+  handleTouchEnd() {
+    this.state.isDrag = false;
+    // tras un pinch reciente, no tratar el toque como tap-pintar
+    if (Date.now() - this.input.lZoomT < 400) this.state.hasMov = true;
+    // hasMov se resetea en el proximo touchstart/mousedown (evita carrera con el click)
+  },
+
+  backToUpload() {
+    this.ui.gameView.style.display = 'none';
+    this.ui.uploadView.style.display = 'flex';
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => SvgGame.init());

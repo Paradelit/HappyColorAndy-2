@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Andy Color · Tu foto → Color by Number</title>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; background: #f0f0f0; overflow: hidden; }
+
+  /* ---------- Vista de subida ---------- */
+  #upload-view {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; overflow-y: auto;
+  }
+  .card {
+    background: #fff; border-radius: 20px; padding: 28px; width: 100%; max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
+  .card h1 { font-size: 1.4rem; color: #333; margin-bottom: 4px; }
+  .card p.sub { color: #888; font-size: .85rem; margin-bottom: 20px; }
+  .drop {
+    border: 2px dashed #c9c9d6; border-radius: 14px; padding: 28px 16px; text-align: center;
+    cursor: pointer; transition: .2s; color: #777; margin-bottom: 18px;
+  }
+  .drop:hover, .drop.over { border-color: #764ba2; background: #f7f5ff; color: #764ba2; }
+  .drop .big { font-size: 2.4rem; }
+  .drop small { display: block; margin-top: 6px; font-size: .75rem; color: #aaa; }
+  #preview-thumb { max-width: 100%; max-height: 180px; border-radius: 10px; margin: 0 auto 14px; display: none; }
+
+  .knob { margin-bottom: 14px; }
+  .knob label { display: flex; justify-content: space-between; font-size: .82rem; color: #555; margin-bottom: 6px; font-weight: 600; }
+  .knob label .val { color: #764ba2; }
+  .knob input[type=range] { width: 100%; accent-color: #764ba2; }
+  .knob small { color: #aaa; font-size: .7rem; }
+
+  .row { display: flex; gap: 10px; }
+  .row .knob { flex: 1; }
+
+  .backend { display: flex; gap: 8px; align-items: center; margin: 6px 0 18px; }
+  .backend input { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: .8rem; }
+  .backend label { font-size: .7rem; color: #999; }
+
+  .btn {
+    width: 100%; border: none; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 700;
+    color: #fff; background: #d63384; cursor: pointer; transition: .15s;
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .err { color: #c0392b; font-size: .8rem; margin-top: 10px; min-height: 1em; text-align: center; }
+
+  /* ---------- Overlay de carga ---------- */
+  #loading-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; flex-direction: column; color: #fff; z-index: 50;
+  }
+  .spinner { width: 54px; height: 54px; border: 5px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-overlay p { margin-top: 16px; font-weight: 600; }
+
+  /* ---------- Vista de juego ---------- */
+  #game-view { flex: 1; display: none; flex-direction: column; }
+  #topbar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 10; }
+  #back-btn { border: none; background: #eee; border-radius: 10px; padding: 8px 12px; cursor: pointer; font-size: 1rem; }
+  #progress-wrap { flex: 1; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
+  #progress-bar { height: 100%; width: 0%; background: #d63384; transition: width .3s ease; }
+  #progress-pct { font-size: .8rem; color: #777; min-width: 38px; text-align: right; }
+
+  #viewport { flex: 1; position: relative; overflow: hidden; background: #e6e6e6; touch-action: none; }
+  #shake-layer { position: relative; width: 100%; height: 100%; }
+  #shake-layer.shake { animation: shake .3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+  #zoom-layer { transform-origin: 0 0; transition: none; position: absolute; top: 0; left: 0; }
+  #svg-canvas { display: block; }
+
+  .region { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 1; cursor: pointer; }
+  .region.painted { stroke-opacity: .25; }
+  .rlabel { fill: #999; font-family: sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+  /* En victoria ocultamos lineas y numeros para revelar el poster limpio */
+  #svg-canvas.revealed .region { stroke-opacity: 0; transition: stroke-opacity .8s ease; }
+  #svg-canvas.revealed .rlabel { opacity: 0; transition: opacity .6s ease; }
+
+  /* ---------- Paleta (reusa el estilo del juego) ---------- */
+  .paleta-container { flex: 0 0 100px; background: #fff; display: flex; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,.1); padding: 10px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+  .paleta { display: flex; gap: 12px; padding: 5px 0; }
+  .color-btn { --btn-color: #ccc; --progress: 0%; min-width: 60px; height: 60px; border-radius: 15px; position: relative; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,.15); transition: all .2s ease; background: var(--btn-color); display: flex; justify-content: center; align-items: center; border: 3px solid transparent; overflow: hidden; }
+  .color-btn::before { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: var(--progress); background: rgba(255,255,255,.4); pointer-events: none; transition: height .3s ease; }
+  .color-btn:active { transform: scale(.9); }
+  .color-btn.selected { border-color: #d63384; box-shadow: 0 0 0 3px rgba(214,51,132,.2), 0 4px 12px rgba(0,0,0,.2); transform: scale(1.1); }
+  .color-btn.completed { opacity: .6; cursor: not-allowed; }
+  .color-btn.completed::before { display: none; }
+  .color-btn.completed::after { content: '✓'; position: absolute; top: 3px; right: 3px; background: #4CAF50; color: #fff; border-radius: 50%; width: 18px; height: 18px; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; }
+  .color-number { font-size: 1rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+
+  #victory { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; z-index: 60; }
+  #victory h2 { font-size: 2rem; margin-bottom: 10px; }
+  #victory button { margin-top: 18px; border: none; border-radius: 12px; padding: 12px 24px; font-weight: 700; background: #d63384; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+
+  <!-- ===== Vista de subida ===== -->
+  <div id="upload-view">
+    <div class="card">
+      <h1>🎨 Tu foto → Color by Number</h1>
+      <p class="sub">Sube una foto y genera un mandala numerado vectorial con zoom infinito.</p>
+
+      <img id="preview-thumb" alt="vista previa">
+      <div class="drop" id="drop">
+        <div class="big">📷</div>
+        <div>Toca para elegir una foto</div>
+        <small>JPG / PNG · se procesa en el servidor</small>
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+
+      <div class="row">
+        <div class="knob">
+          <label>Nº de colores <span class="val" id="v-colors">24</span></label>
+          <input type="range" id="n_colors" min="12" max="40" value="24">
+          <small>menos = más simple</small>
+        </div>
+        <div class="knob">
+          <label>Detalle <span class="val" id="v-area">0.10%</span></label>
+          <input type="range" id="min_area" min="2" max="60" value="10">
+          <small>menos = más detalle</small>
+        </div>
+      </div>
+      <div class="knob">
+        <label>Suavizado de bordes <span class="val" id="v-tol">1.5</span></label>
+        <input type="range" id="simplify" min="5" max="40" value="15">
+        <small>más = bordes más suaves/redondeados</small>
+      </div>
+
+      <div class="backend">
+        <label>API</label>
+        <input type="text" id="backend-url" value="http://localhost:8000">
+      </div>
+
+      <button class="btn" id="generate" disabled>Generar</button>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+  <!-- ===== Vista de juego ===== -->
+  <div id="game-view">
+    <div id="topbar">
+      <button id="back-btn">←</button>
+      <div id="progress-wrap"><div id="progress-bar"></div></div>
+      <div id="progress-pct">0%</div>
+    </div>
+    <div id="viewport">
+      <div id="shake-layer">
+        <div id="zoom-layer">
+          <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+    </div>
+    <div class="paleta-container">
+      <div class="paleta" id="paleta"></div>
+    </div>
+  </div>
+
+  <div id="loading-overlay"><div class="spinner"></div><p id="loading-text">Generando tu obra…</p></div>
+
+  <div id="victory">
+    <h2>🎉 ¡Completado!</h2>
+    <p>Tu foto es ahora una obra de arte.</p>
+    <button id="victory-close">Crear otra</button>
+  </div>
+
+  <script src="js/svg-game.js"></script>
+</body>
+</html>
