@@ -1,16 +1,19 @@
-"""Etapa 4: vectorizacion.
+"""Etapa 4: vectorizacion (sin OpenCV).
 
 Convierte cada region raster en un path SVG suave:
-  region -> mascara binaria -> cv2.findContours (RETR_CCOMP, soporta agujeros)
-         -> cv2.approxPolyDP (simplificacion) -> curvas Bezier (Catmull-Rom).
+  region -> mascara -> skimage.measure.find_contours (marching squares)
+         -> simplificacion Douglas-Peucker (shapely) -> Bezier (Catmull-Rom).
 
-Los agujeros se emiten como subpaths adicionales; el render usa fill-rule
-"evenodd" para vaciarlos. La funcion `region_to_path` esta aislada para poder
-sustituir el metodo (p.ej. potrace) sin tocar el resto del pipeline.
+La mascara se rellena con un borde de ceros para que las regiones que tocan el
+filo de la imagen produzcan contornos cerrados. Los agujeros aparecen como
+contornos adicionales y se emiten como subpaths; el render usa fill-rule
+"evenodd" para vaciarlos. `region_to_path` esta aislada para poder sustituir el
+metodo (p.ej. potrace) sin tocar el resto del pipeline.
 """
 
-import cv2
 import numpy as np
+from shapely.geometry import LinearRing, Polygon
+from skimage.measure import find_contours
 
 
 def _round(v: float) -> float:
@@ -18,10 +21,7 @@ def _round(v: float) -> float:
 
 
 def _catmull_rom_to_bezier(points) -> str:
-    """Convierte un poligono cerrado de puntos en un path de Beziers cubicas.
-
-    `points`: lista de (x, y). Devuelve el subpath SVG ("M ... C ... Z").
-    """
+    """Poligono cerrado de puntos -> subpath SVG ("M ... C ... Z")."""
     n = len(points)
     if n < 3:
         return ""
@@ -46,22 +46,32 @@ def _catmull_rom_to_bezier(points) -> str:
     return " ".join(d)
 
 
-def region_to_path(mask: np.ndarray, simplify_tol: float = 1.5) -> str:
+def region_to_path(mask: np.ndarray, simplify_tol: float = 1.5, min_area: float = 2.0) -> str:
     """Mascara binaria de una region -> path SVG (outer + holes), o "" si nula."""
-    m = (mask.astype(np.uint8)) * 255
-    contours, hierarchy = cv2.findContours(m, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    padded = np.pad(mask.astype(np.uint8), 1, mode="constant", constant_values=0)
+    # find_contours devuelve loops cerrados de coords (fila, columna) en float.
+    contours = find_contours(padded, level=0.5)
     if not contours:
         return ""
 
     subpaths = []
-    for cnt in contours:
-        if cv2.contourArea(cnt) < 2:
+    for c in contours:
+        # (fila, col) -> (x, y), descontando el padding de 1 px.
+        pts = [(float(col) - 1.0, float(row) - 1.0) for row, col in c]
+        if len(pts) < 4:
             continue
-        approx = cv2.approxPolyDP(cnt, epsilon=simplify_tol, closed=True)
-        pts = approx.reshape(-1, 2)
-        if len(pts) < 3:
+        try:
+            ring = LinearRing(pts)
+        except Exception:
             continue
-        sub = _catmull_rom_to_bezier([(float(x), float(y)) for x, y in pts])
+        simp = ring.simplify(simplify_tol, preserve_topology=False)
+        coords = list(simp.coords)
+        if len(coords) < 4:
+            continue
+        if Polygon(coords).area < min_area:
+            continue
+        # coords cierra repitiendo el primer punto: lo quitamos para Catmull-Rom.
+        sub = _catmull_rom_to_bezier(coords[:-1])
         if sub:
             subpaths.append(sub)
 

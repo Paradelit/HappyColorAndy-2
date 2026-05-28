@@ -15,16 +15,15 @@ paleta y su area.
 import heapq
 from collections import defaultdict
 
-import cv2
 import numpy as np
+from skimage.color import rgb2lab
 from skimage.measure import label as cc_label
 
 
 def _palette_lab(palette):
     """Paleta RGB -> LAB (float) para medir cercania perceptual entre colores."""
-    rgb = np.array([p["rgb"] for p in palette], dtype=np.uint8).reshape(1, -1, 3)
-    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
-    return lab
+    rgb = np.array([p["rgb"] for p in palette], dtype=np.float64).reshape(1, -1, 3) / 255.0
+    return rgb2lab(rgb).reshape(-1, 3).astype(np.float32)
 
 
 def _build_adjacency(regions, n_regions):

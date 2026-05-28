@@ -1,21 +1,13 @@
-"""Etapa 2: cuantizacion de color.
+"""Etapa 2: cuantizacion de color (sin OpenCV).
 
-Reduce la imagen a una paleta pequena (~24 colores) con k-means en espacio LAB,
-donde las distancias euclideas se aproximan a la percepcion humana. Devuelve un
-mapa de etiquetas (cada pixel -> indice de paleta) y la paleta en hex/RGB.
+Reduce la imagen a una paleta pequena (~24 colores) con k-means en espacio LAB
+(via scikit-image), donde las distancias euclideas se aproximan a la percepcion
+humana. Devuelve un mapa de etiquetas (pixel -> indice de paleta) y la paleta.
 """
 
-import cv2
 import numpy as np
+from skimage.color import lab2rgb, rgb2lab
 from sklearn.cluster import MiniBatchKMeans
-
-
-def _rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
-    return cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB)
-
-
-def _lab_to_rgb(lab: np.ndarray) -> np.ndarray:
-    return cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
 
 
 def _hex(r: int, g: int, b: int) -> str:
@@ -30,7 +22,7 @@ def quantize(rgb: np.ndarray, n_colors: int = 24, seed: int = 42):
         palette     list[dict]    -> [{index, hex, rgb:[r,g,b]}]
     """
     h, w = rgb.shape[:2]
-    lab = _rgb_to_lab(rgb).reshape(-1, 3).astype(np.float32)
+    lab = rgb2lab(rgb.astype(np.float64) / 255.0).reshape(-1, 3).astype(np.float32)
 
     n_colors = max(2, min(n_colors, 64))
     km = MiniBatchKMeans(
@@ -44,8 +36,9 @@ def quantize(rgb: np.ndarray, n_colors: int = 24, seed: int = 42):
     label_image = labels.reshape(h, w).astype(np.int32)
 
     # Centroides LAB -> RGB para la paleta.
-    centers_lab = km.cluster_centers_.reshape(1, -1, 3).astype(np.uint8)
-    centers_rgb = _lab_to_rgb(centers_lab).reshape(-1, 3)
+    centers_lab = km.cluster_centers_.reshape(1, -1, 3).astype(np.float64)
+    centers_rgb = (np.clip(lab2rgb(centers_lab), 0.0, 1.0) * 255.0).reshape(-1, 3)
+    centers_rgb = np.round(centers_rgb).astype(np.uint8)
 
     palette = []
     for i, (r, g, b) in enumerate(centers_rgb):

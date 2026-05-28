@@ -13,8 +13,8 @@ Ejecutar local:
 
 import io
 
-import cv2
 import numpy as np
+from PIL import Image
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -92,11 +92,10 @@ async def preview(
         pal_rgb = np.array([p["rgb"] for p in palette], dtype=np.uint8)
         color_per_region = np.array(region_color, dtype=np.int64)
         out_rgb = pal_rgb[color_per_region[region_map]]
-        ok, buf = cv2.imencode(".png", cv2.cvtColor(out_rgb, cv2.COLOR_RGB2BGR))
-        if not ok:
-            raise RuntimeError("No se pudo codificar el PNG.")
+        buf = io.BytesIO()
+        Image.fromarray(out_rgb).save(buf, format="PNG")
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Error en preview: {exc}")
-    return Response(content=buf.tobytes(), media_type="image/png")
+    return Response(content=buf.getvalue(), media_type="image/png")

@@ -1,14 +1,14 @@
-"""Etapa 1: preprocesado.
+"""Etapa 1: preprocesado (sin OpenCV).
 
 Orienta la imagen segun EXIF, la reescala a un tamano de trabajo manejable y
-la suaviza preservando bordes. El suavizado (mean-shift + bilateral) es lo que
-convierte una foto con gradientes y ruido en zonas de color planas, dando el
-aspecto de "poster disenado" en lugar de un trazado automatico ruidoso.
+la aplana con denoising por Variacion Total (TV). El denoising TV produce
+regiones planas a trozos (piecewise-constant), justo el aspecto de "poster
+disenado" que buscamos antes de cuantizar; sustituye al mean-shift de OpenCV.
 """
 
-import cv2
 import numpy as np
 from PIL import Image, ImageOps
+from skimage.restoration import denoise_tv_chambolle
 
 
 def load_rgb(file_bytes: bytes) -> np.ndarray:
@@ -30,21 +30,18 @@ def resize_longest(rgb: np.ndarray, longest: int) -> np.ndarray:
     scale = longest / float(cur)
     new_w = max(1, int(round(w * scale)))
     new_h = max(1, int(round(h * scale)))
-    return cv2.resize(rgb, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    im = Image.fromarray(rgb).resize((new_w, new_h), Image.LANCZOS)
+    return np.asarray(im)
 
 
-def smooth(rgb: np.ndarray, sp: int = 18, sr: int = 32) -> np.ndarray:
-    """Suavizado preservando bordes.
+def smooth(rgb: np.ndarray, weight: float = 0.1) -> np.ndarray:
+    """Aplana gradientes y ruido preservando bordes (denoising TV).
 
-    1) pyrMeanShiftFiltering: colapsa gradientes en mesetas de color plano.
-    2) bilateralFilter: limpia el ruido residual sin difuminar bordes.
-
-    OpenCV trabaja en BGR; convertimos de ida y vuelta.
+    `weight` mayor => mas plano (mas regiones grandes); menor => mas detalle.
     """
-    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    shifted = cv2.pyrMeanShiftFiltering(bgr, sp=sp, sr=sr)
-    filtered = cv2.bilateralFilter(shifted, d=9, sigmaColor=75, sigmaSpace=75)
-    return cv2.cvtColor(filtered, cv2.COLOR_BGR2RGB)
+    f = rgb.astype(np.float32) / 255.0
+    out = denoise_tv_chambolle(f, weight=weight, channel_axis=-1)
+    return (np.clip(out, 0.0, 1.0) * 255.0).astype(np.uint8)
 
 
 def preprocess(file_bytes: bytes, process_size: int = 1200) -> np.ndarray:
