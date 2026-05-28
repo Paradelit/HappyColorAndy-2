@@ -59,7 +59,7 @@ async def generate(
     min_area_pct: float = Form(0.1),
     simplify_tol: float = Form(1.5),
     process_size: int = Form(1200),
-    max_regions: int = Form(400),
+    max_regions: int = Form(800),
 ):
     data = await _read_image(file)
     try:
@@ -82,7 +82,7 @@ async def preview(
     n_colors: int = Form(24),
     min_area_pct: float = Form(0.1),
     process_size: int = Form(1200),
-    max_regions: int = Form(400),
+    max_regions: int = Form(800),
 ):
     """Devuelve un PNG con cada region pintada de su color (para ajustar knobs)."""
     data = await _read_image(file)

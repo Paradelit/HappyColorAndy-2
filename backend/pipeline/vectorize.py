@@ -4,14 +4,16 @@ Convierte cada region raster en un path SVG suave:
   region -> mascara -> skimage.measure.find_contours (marching squares)
          -> simplificacion Douglas-Peucker (shapely) -> Bezier (Catmull-Rom).
 
+Para ser rapido, cada region se recorta a su bounding box (find_objects) y se
+procesa solo ese recorte; las coordenadas se trasladan luego a la imagen.
+
 La mascara se rellena con un borde de ceros para que las regiones que tocan el
-filo de la imagen produzcan contornos cerrados. Los agujeros aparecen como
-contornos adicionales y se emiten como subpaths; el render usa fill-rule
-"evenodd" para vaciarlos. `region_to_path` esta aislada para poder sustituir el
-metodo (p.ej. potrace) sin tocar el resto del pipeline.
+filo produzcan contornos cerrados. Los agujeros aparecen como contornos
+adicionales (subpaths) y el render usa fill-rule "evenodd" para vaciarlos.
 """
 
 import numpy as np
+from scipy.ndimage import find_objects
 from shapely.geometry import LinearRing, Polygon
 from skimage.measure import find_contours
 
@@ -46,8 +48,8 @@ def _catmull_rom_to_bezier(points) -> str:
     return " ".join(d)
 
 
-def region_to_path(mask: np.ndarray, simplify_tol: float = 1.5, min_area: float = 2.0) -> str:
-    """Mascara binaria de una region -> path SVG (outer + holes), o "" si nula."""
+def region_to_path(mask, ox=0, oy=0, simplify_tol: float = 1.5, min_area: float = 2.0) -> str:
+    """Mascara (recorte) de una region -> path SVG, trasladado por (ox, oy)."""
     padded = np.pad(mask.astype(np.uint8), 1, mode="constant", constant_values=0)
     # find_contours devuelve loops cerrados de coords (fila, columna) en float.
     contours = find_contours(padded, level=0.5)
@@ -56,8 +58,8 @@ def region_to_path(mask: np.ndarray, simplify_tol: float = 1.5, min_area: float 
 
     subpaths = []
     for c in contours:
-        # (fila, col) -> (x, y), descontando el padding de 1 px.
-        pts = [(float(col) - 1.0, float(row) - 1.0) for row, col in c]
+        # (fila, col) -> (x, y): -1 por el padding, +offset del bounding box.
+        pts = [(float(col) - 1.0 + ox, float(row) - 1.0 + oy) for row, col in c]
         if len(pts) < 4:
             continue
         try:
@@ -79,17 +81,22 @@ def region_to_path(mask: np.ndarray, simplify_tol: float = 1.5, min_area: float 
 
 
 def vectorize(region_map, n_regions: int, simplify_tol: float = 1.5):
-    """Genera el path SVG de cada region.
+    """Genera el path SVG de cada region (procesando solo su bounding box).
 
     Returns:
         dict region_id -> path string ("d"). Regiones sin contorno valido se omiten.
     """
+    slices = find_objects(region_map + 1)  # +1: la etiqueta 0 no es "fondo"
     paths = {}
-    for rid in range(n_regions):
-        mask = region_map == rid
-        if not mask.any():
+    for rid in range(min(n_regions, len(slices))):
+        sl = slices[rid]
+        if sl is None:
             continue
-        d = region_to_path(mask, simplify_tol=simplify_tol)
+        sub = region_map[sl] == rid
+        if not sub.any():
+            continue
+        oy, ox = sl[0].start, sl[1].start
+        d = region_to_path(sub, ox=ox, oy=oy, simplify_tol=simplify_tol)
         if d:
             paths[rid] = d
     return paths

@@ -16,7 +16,7 @@ def generate_color_by_number(
     min_area_pct: float = 0.1,
     simplify_tol: float = 1.5,
     process_size: int = 1200,
-    max_regions: int = 400,
+    max_regions: int = 800,
 ):
     """Ejecuta las 6 etapas y devuelve el dict JSON listo para el frontend."""
     t0 = time.time()

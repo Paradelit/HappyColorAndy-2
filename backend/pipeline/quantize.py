@@ -24,7 +24,7 @@ def quantize(rgb: np.ndarray, n_colors: int = 24, seed: int = 42):
     h, w = rgb.shape[:2]
     lab = rgb2lab(rgb.astype(np.float64) / 255.0).reshape(-1, 3).astype(np.float32)
 
-    n_colors = max(2, min(n_colors, 64))
+    n_colors = max(2, min(n_colors, 120))
     km = MiniBatchKMeans(
         n_clusters=n_colors,
         random_state=seed,
