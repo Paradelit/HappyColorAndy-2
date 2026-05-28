@@ -17,6 +17,13 @@ const SvgGame = {
   },
   // por indice de paleta: cuantas regiones quedan / total
   colorRemaining: [], colorTotal: [],
+  // mapas de apoyo (se llenan en buildSvg)
+  pathEls: {},        // region id -> <path>
+  labelEls: {},       // region id -> <text>
+  regionsById: {},    // region id -> objeto region
+  regionsByColor: {}, // indice de color -> [region ids]
+  targetEls: [],      // regiones actualmente resaltadas
+  sig: '',            // firma del puzzle (para guardar/retomar progreso)
   input: { lX: 0, lY: 0, initDist: 0, lZoomT: 0 },
 
   // ---------- arranque ----------
@@ -114,8 +121,14 @@ const SvgGame = {
     const n = doc.palette.length;
     this.colorRemaining = new Array(n).fill(0);
     this.colorTotal = new Array(n).fill(0);
+    this.pathEls = {};
+    this.labelEls = {};
+    this.regionsById = {};
+    this.regionsByColor = {};
+    this.targetEls = [];
     this.state.paintedCount = 0;
     this.state.totalRegions = doc.regions.length;
+    this.sig = this.signature(doc);
 
     this.buildSvg();
     this.generarPaletaUI();
@@ -123,6 +136,7 @@ const SvgGame = {
     this.ui.uploadView.style.display = 'none';
     this.ui.gameView.style.display = 'flex';
     this.fitCamera(doc.width, doc.height);
+    this.resumeProgress();      // retoma lo ya pintado de una sesion anterior
     this.selectFirstAvailable();
     this.updateProgress();
   },
@@ -150,6 +164,9 @@ const SvgGame = {
       p.dataset.color = r.color;
       p.addEventListener('click', () => this.onRegionClick(r, p));
       paths.appendChild(p);
+      this.pathEls[r.id] = p;
+      this.regionsById[r.id] = r;
+      (this.regionsByColor[r.color] = this.regionsByColor[r.color] || []).push(r.id);
       this.colorTotal[r.color]++;
       this.colorRemaining[r.color]++;
 
@@ -161,6 +178,7 @@ const SvgGame = {
         t.setAttribute('class', 'rlabel');
         t.textContent = (r.color + 1);
         labels.appendChild(t);
+        this.labelEls[r.id] = t;
       }
     });
 
@@ -173,18 +191,96 @@ const SvgGame = {
     if (this.state.hasMov) return;            // fue arrastre/pinch, no pintar
     if (pathEl.classList.contains('painted')) return;
     if (r.color !== this.state.selectedColor) { this.shake(); return; }
+    this.paint(r, pathEl, { feedback: true });
+  },
 
-    const hex = this.doc.palette[r.color].hex;
-    pathEl.style.fill = hex;   // inline-style: gana a la regla CSS .region
+  // Pinta una region (sin comprobar el color seleccionado). Reusado por click,
+  // varita magica y al retomar progreso. opts.feedback => vibra + sonidos +
+  // avanza de color + comprueba victoria.
+  paint(r, pathEl, opts = {}) {
+    if (pathEl.classList.contains('painted')) return;
+    pathEl.style.fill = this.doc.palette[r.color].hex; // inline gana a la CSS
+    pathEl.classList.remove('target');
     pathEl.classList.add('painted');
+    const lbl = this.labelEls[r.id];
+    if (lbl) lbl.classList.add('hidden');     // el numero desaparece al pintar
     this.state.paintedCount++;
     this.colorRemaining[r.color]--;
     this.updateColorBtn(r.color);
     this.updateProgress();
-    this.vibrate(30);
 
-    if (this.colorRemaining[r.color] === 0) this.onColorCompleted(r.color);
+    if (opts.feedback) {
+      this.vibrate(30);
+      if (this.colorRemaining[r.color] === 0) this.onColorCompleted(r.color);
+      if (this.state.paintedCount === this.state.totalRegions) this.triggerVictory();
+    }
+    this.saveProgress();
+  },
+
+  // ---------- resaltado de las regiones del color seleccionado ----------
+  clearTargets() {
+    this.targetEls.forEach(el => {
+      el.classList.remove('target');
+      if (!el.classList.contains('painted')) el.style.fill = ''; // vuelve a la CSS
+    });
+    this.targetEls = [];
+  },
+
+  highlightTargets(colorIdx) {
+    this.clearTargets();
+    const tintHex = this.tint(this.doc.palette[colorIdx].hex, 0.78);
+    (this.regionsByColor[colorIdx] || []).forEach(id => {
+      const el = this.pathEls[id];
+      if (el && !el.classList.contains('painted')) {
+        el.style.fill = tintHex;     // pista de color suave
+        el.classList.add('target');  // pulso (CSS)
+        this.targetEls.push(el);
+      }
+    });
+  },
+
+  // mezcla un color hacia el blanco (amt 0..1 = cuanto blanco)
+  tint(hex, amt) {
+    const { r, g, b } = this.hexToRgb(hex);
+    const m = v => Math.round(v + (255 - v) * amt);
+    return `rgb(${m(r)},${m(g)},${m(b)})`;
+  },
+
+  // ---------- varita magica: pinta todas las del color seleccionado ----------
+  magicWand() {
+    const i = this.state.selectedColor;
+    if (i < 0) return;
+    const ids = (this.regionsByColor[i] || []).filter(id => !this.pathEls[id].classList.contains('painted'));
+    if (!ids.length) return;
+    ids.forEach(id => this.paint(this.regionsById[id], this.pathEls[id], { feedback: false }));
+    this.vibrate([40, 40, 40]);
     if (this.state.paintedCount === this.state.totalRegions) this.triggerVictory();
+    else this.onColorCompleted(i);
+  },
+
+  // ---------- pista: lleva la camara a una region pendiente y la hace parpadear ----------
+  hint() {
+    const i = this.state.selectedColor;
+    if (i < 0) return;
+    const id = (this.regionsByColor[i] || []).find(id => !this.pathEls[id].classList.contains('painted'));
+    if (id === undefined) return;
+    const el = this.pathEls[id];
+    this.centerOn(el);
+    el.classList.add('hintpulse');
+    setTimeout(() => el.classList.remove('hintpulse'), 2400);
+  },
+
+  centerOn(el) {
+    const bb = el.getBBox();
+    const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    const vW = this.ui.viewport.clientWidth, vH = this.ui.viewport.clientHeight;
+    const target = Math.min(8, Math.max(this.state.scale, 3));
+    this.state.scale = target;
+    this.state.pX = vW / 2 - cx * target;
+    this.state.pY = vH / 2 - cy * target;
+    this.ui.zoomLayer.style.transition = 'transform .4s ease';
+    this.updateTransform();
+    setTimeout(() => { this.ui.zoomLayer.style.transition = 'none'; }, 420);
   },
 
   shake() {
@@ -233,7 +329,48 @@ const SvgGame = {
     document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
     const btn = document.getElementById('cbtn-' + i);
     if (btn) { btn.classList.add('selected'); btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); }
+    this.highlightTargets(i);   // resalta donde hay que pintar
   },
+
+  // ---------- guardar / retomar progreso (localStorage) ----------
+  signature(doc) {
+    // firma barata pero suficiente para no confundir dos puzzles distintos
+    let h = doc.regions.length * 2654435761;
+    h ^= doc.width * 40503 + doc.height;
+    doc.palette.forEach(p => { for (const c of p.hex) h = (h * 31 + c.charCodeAt(0)) | 0; });
+    return 'svgpaint:' + (h >>> 0).toString(36) + ':' + doc.regions.length;
+  },
+
+  saveProgress() {
+    if (!this.sig) return;
+    const ids = [];
+    for (const id in this.pathEls) {
+      if (this.pathEls[id].classList.contains('painted')) ids.push(+id);
+    }
+    try { localStorage.setItem(this.sig, JSON.stringify(ids)); } catch (e) { /* cuota llena */ }
+  },
+
+  resumeProgress() {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem(this.sig) || '[]'); } catch (e) { saved = []; }
+    saved.forEach(id => {
+      const el = this.pathEls[id], r = this.regionsById[id];
+      if (el && r) this.paint(r, el, { feedback: false });
+    });
+  },
+
+  // ---------- botones de zoom ----------
+  zoomBy(factor) {
+    const vW = this.ui.viewport.clientWidth, vH = this.ui.viewport.clientHeight;
+    const mx = vW / 2, my = vH / 2;
+    const ns = Math.min(Math.max(0.1, this.state.scale * factor), 40);
+    this.state.pX = mx - (mx - this.state.pX) * (ns / this.state.scale);
+    this.state.pY = my - (my - this.state.pY) * (ns / this.state.scale);
+    this.state.scale = ns;
+    this.updateTransform();
+  },
+
+  fit() { if (this.doc) this.fitCamera(this.doc.width, this.doc.height); },
 
   selectFirstAvailable() {
     for (let i = 0; i < this.colorRemaining.length; i++) {
@@ -318,6 +455,13 @@ const SvgGame = {
     // botones
     document.getElementById('back-btn').onclick = () => this.backToUpload();
     document.getElementById('victory-close').onclick = () => { this.ui.victory.style.display = 'none'; this.backToUpload(); };
+    // herramientas (zoom / pista / varita)
+    const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+    bind('tool-zoom-in', () => this.zoomBy(1.4));
+    bind('tool-zoom-out', () => this.zoomBy(0.72));
+    bind('tool-fit', () => this.fit());
+    bind('tool-hint', () => this.hint());
+    bind('tool-wand', () => this.magicWand());
   },
 
   handleWheel(e) {

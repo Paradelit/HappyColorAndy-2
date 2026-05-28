@@ -77,10 +77,23 @@
 
   .region { fill: #f7f7f7; stroke: #cfcfcf; stroke-width: 1; cursor: pointer; }
   .region.painted { stroke-opacity: .25; }
-  .rlabel { fill: #999; font-family: sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+  /* regiones del color seleccionado: tinte (inline) + pulso suave */
+  .region.target { animation: targetPulse 1.5s ease-in-out infinite; }
+  @keyframes targetPulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+  /* pista: parpadeo fuerte del borde */
+  .region.hintpulse { stroke: #d63384; stroke-width: 3; animation: hintPulse .55s ease-in-out infinite; }
+  @keyframes hintPulse { 0%,100% { stroke-opacity: 1; } 50% { stroke-opacity: .15; } }
+  .rlabel { fill: #555; font-family: sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+  .rlabel.hidden { display: none; }   /* el numero desaparece al pintar */
   /* En victoria ocultamos lineas y numeros para revelar el poster limpio */
   #svg-canvas.revealed .region { stroke-opacity: 0; transition: stroke-opacity .8s ease; }
   #svg-canvas.revealed .rlabel { opacity: 0; transition: opacity .6s ease; }
+
+  /* barra de herramientas flotante */
+  #tools { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 20; }
+  #tools button { width: 46px; height: 46px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.22); font-size: 1.25rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #tools button:active { transform: scale(.92); }
+  #tools button.accent { background: #d63384; color: #fff; }
 
   /* ---------- Paleta (reusa el estilo del juego) ---------- */
   .paleta-container { flex: 0 0 100px; background: #fff; display: flex; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,.1); padding: 10px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
@@ -155,6 +168,13 @@
         <div id="zoom-layer">
           <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
+      </div>
+      <div id="tools">
+        <button id="tool-hint" title="Pista">💡</button>
+        <button id="tool-wand" class="accent" title="Varita mágica (pinta todo el color)">✨</button>
+        <button id="tool-zoom-in" title="Acercar">+</button>
+        <button id="tool-zoom-out" title="Alejar">−</button>
+        <button id="tool-fit" title="Ajustar a pantalla">⊡</button>
       </div>
     </div>
     <div class="paleta-container">

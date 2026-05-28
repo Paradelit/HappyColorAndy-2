@@ -59,6 +59,7 @@ async def generate(
     min_area_pct: float = Form(0.1),
     simplify_tol: float = Form(1.5),
     process_size: int = Form(1200),
+    max_regions: int = Form(400),
 ):
     data = await _read_image(file)
     try:
@@ -68,6 +69,7 @@ async def generate(
             min_area_pct=float(min_area_pct),
             simplify_tol=float(simplify_tol),
             process_size=int(process_size),
+            max_regions=int(max_regions),
         )
     except Exception as exc:  # noqa: BLE001 - PoC: superficie de error simple
         raise HTTPException(status_code=500, detail=f"Error procesando imagen: {exc}")
@@ -80,6 +82,7 @@ async def preview(
     n_colors: int = Form(24),
     min_area_pct: float = Form(0.1),
     process_size: int = Form(1200),
+    max_regions: int = Form(400),
 ):
     """Devuelve un PNG con cada region pintada de su color (para ajustar knobs)."""
     data = await _read_image(file)
@@ -87,7 +90,8 @@ async def preview(
         rgb = preprocess(data, process_size=int(process_size))
         label_image, palette = quantize(rgb, n_colors=int(n_colors))
         region_map, region_color, _ = segment(
-            label_image, palette, min_area_pct=float(min_area_pct)
+            label_image, palette, min_area_pct=float(min_area_pct),
+            max_regions=int(max_regions),
         )
         pal_rgb = np.array([p["rgb"] for p in palette], dtype=np.uint8)
         color_per_region = np.array(region_color, dtype=np.int64)

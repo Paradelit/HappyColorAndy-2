@@ -16,6 +16,7 @@ def generate_color_by_number(
     min_area_pct: float = 0.1,
     simplify_tol: float = 1.5,
     process_size: int = 1200,
+    max_regions: int = 400,
 ):
     """Ejecuta las 6 etapas y devuelve el dict JSON listo para el frontend."""
     t0 = time.time()
@@ -25,7 +26,7 @@ def generate_color_by_number(
 
     label_image, palette = quantize(rgb, n_colors=n_colors)
     region_map, region_color, _region_area = segment(
-        label_image, palette, min_area_pct=min_area_pct
+        label_image, palette, min_area_pct=min_area_pct, max_regions=max_regions
     )
     n_regions = len(region_color)
 
@@ -38,6 +39,7 @@ def generate_color_by_number(
         "min_area_pct": min_area_pct,
         "simplify_tol": simplify_tol,
         "process_size": process_size,
+        "max_regions": max_regions,
         "n_regions": len(doc["regions"]),
         "elapsed_ms": int((time.time() - t0) * 1000),
     }

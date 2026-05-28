@@ -49,13 +49,16 @@ def _build_adjacency(regions, n_regions):
     return adj
 
 
-def segment(label_image, palette, min_area_pct: float = 0.1):
+def segment(label_image, palette, min_area_pct: float = 0.1, max_regions: int = 400):
     """Segmenta y fusiona regiones pequenas.
 
     Args:
         label_image: (H, W) indice de paleta por pixel (de quantize).
         palette: lista de la paleta (para distancia LAB en desempates).
         min_area_pct: area minima de una region como % del area total.
+        max_regions: tope de regiones; si tras la fusion por area quedan mas,
+            se siguen fusionando las mas pequenas hasta bajar del tope. Evita el
+            "confeti" en fotos con mucho detalle. 0/None lo desactiva.
 
     Returns:
         region_map (H, W) int32  -> id de region contiguo (0..M-1)
@@ -67,7 +70,10 @@ def segment(label_image, palette, min_area_pct: float = 0.1):
     min_area = max(1, int(total * (min_area_pct / 100.0)))
 
     # 1) Componentes conexas de color constante.
-    regions = cc_label(label_image, connectivity=1).astype(np.int64)
+    #    background=-1: NINGUN indice de paleta se trata como fondo, asi cada
+    #    color se separa en sus componentes conexas reales (con el default 0
+    #    skimage fusionaria todas las zonas del color 0 en una sola region).
+    regions = cc_label(label_image, background=-1, connectivity=1).astype(np.int64)
     n_regions = int(regions.max()) + 1  # etiquetas 0..n_regions-1
 
     # Color e indice de paleta de cada region inicial.
@@ -82,6 +88,7 @@ def segment(label_image, palette, min_area_pct: float = 0.1):
 
     # Union-Find para registrar fusiones.
     parent = list(range(n_regions))
+    active = int((area > 0).sum())  # nº de regiones reales (con pixeles)
 
     def find(x):
         root = x
@@ -91,43 +98,28 @@ def segment(label_image, palette, min_area_pct: float = 0.1):
             parent[x], x = root, parent[x]
         return root
 
-    # 2) Fusion lazy con heap de areas (entradas obsoletas se descartan al sacar).
-    heap = [(int(area[r]), r) for r in range(n_regions) if area[r] < min_area]
-    heapq.heapify(heap)
-
-    while heap:
-        a_size, r = heapq.heappop(heap)
-        root = find(r)
-        if root != r:
-            continue  # ya fusionada
-        if area[root] != a_size or area[root] >= min_area:
-            continue  # entrada obsoleta o ya supera el umbral
-
+    def merge_into_best(root):
+        """Fusiona `root` en su mejor vecino. Devuelve el root superviviente o None."""
         neighbors = adj.get(root)
         if not neighbors:
-            continue  # region aislada (raro): se deja
-
-        # Elegir vecino: mayor frontera compartida; desempate por color LAB.
+            return None  # region aislada
+        # Mayor frontera compartida; desempate por color mas cercano en LAB.
         best_n, best_border, best_dist = None, -1, None
         my_lab = lab[region_color[root]]
-        for n, border in neighbors.items():
-            nr = find(n)
+        for nn, border in neighbors.items():
+            nr = find(nn)
             if nr == root:
                 continue
             d = float(np.linalg.norm(lab[region_color[nr]] - my_lab))
             if border > best_border or (border == best_border and (best_dist is None or d < best_dist)):
                 best_n, best_border, best_dist = nr, border, d
-
         if best_n is None:
-            continue
+            return None
 
-        # Fusionar root -> best_n (el vecino conserva su color).
-        parent[root] = best_n
+        parent[root] = best_n               # el vecino conserva su color
         area[best_n] += area[root]
-
-        # Reescribir adyacencias de root hacia best_n.
-        for n, border in neighbors.items():
-            nr = find(n)
+        for nn, border in neighbors.items():
+            nr = find(nn)
             if nr == best_n:
                 continue
             adj[best_n][nr] += border
@@ -135,9 +127,35 @@ def segment(label_image, palette, min_area_pct: float = 0.1):
             adj[nr].pop(root, None)
         adj.pop(root, None)
         adj[best_n].pop(root, None)
+        return best_n
 
-        if area[best_n] < min_area:
-            heapq.heappush(heap, (int(area[best_n]), best_n))
+    # 2a) Fusion por area: eliminar regiones por debajo de min_area (menor primero).
+    heap = [(int(area[r]), r) for r in range(n_regions) if 0 < area[r] < min_area]
+    heapq.heapify(heap)
+    while heap:
+        a_size, r = heapq.heappop(heap)
+        root = find(r)
+        if root != r or area[root] != a_size or area[root] >= min_area:
+            continue  # obsoleta o ya supera el umbral
+        surv = merge_into_best(root)
+        if surv is not None:
+            active -= 1
+            if area[surv] < min_area:
+                heapq.heappush(heap, (int(area[surv]), surv))
+
+    # 2b) Tope de regiones: fusiona las mas pequenas hasta bajar de max_regions.
+    if max_regions and active > max_regions:
+        heap2 = [(int(area[r]), r) for r in range(n_regions) if area[r] > 0 and find(r) == r]
+        heapq.heapify(heap2)
+        while active > max_regions and heap2:
+            a_size, r = heapq.heappop(heap2)
+            root = find(r)
+            if root != r or area[root] != a_size:
+                continue  # obsoleta
+            surv = merge_into_best(root)
+            if surv is not None:
+                active -= 1
+                heapq.heappush(heap2, (int(area[surv]), surv))
 
     # 3) Reetiquetado a ids contiguos.
     roots = np.array([find(r) for r in range(n_regions)], dtype=np.int64)
