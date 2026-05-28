@@ -175,7 +175,7 @@ const SvgGame = {
     if (r.color !== this.state.selectedColor) { this.shake(); return; }
 
     const hex = this.doc.palette[r.color].hex;
-    pathEl.setAttribute('fill', hex);
+    pathEl.style.fill = hex;   // inline-style: gana a la regla CSS .region
     pathEl.classList.add('painted');
     this.state.paintedCount++;
     this.colorRemaining[r.color]--;
