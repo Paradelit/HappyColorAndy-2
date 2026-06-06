@@ -87,9 +87,9 @@
   /* LOD: al alejar se ocultan bordes/numeros de regiones diminutas */
   .region.lod { stroke-opacity: 0; }
   .rlabel.lod { display: none; }
-  /* regiones del color seleccionado: tinte (inline) + pulso suave */
-  .region.target { animation: targetPulse 1.5s ease-in-out infinite; }
-  @keyframes targetPulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+  /* regiones del color seleccionado: relleno de cuadricula gris (estilo Happy
+     Color), estatico. El relleno (url(#checker)) lo pone el JS. */
+  .region.target { stroke: #888; }
   /* pista: parpadeo fuerte del borde */
   .region.hintpulse { stroke: #d63384; stroke-width: 3; animation: hintPulse .55s ease-in-out infinite; }
   @keyframes hintPulse { 0%,100% { stroke-opacity: 1; } 50% { stroke-opacity: .15; } }
@@ -114,8 +114,19 @@
   .color-btn.selected { border-color: #d63384; box-shadow: 0 0 0 3px rgba(214,51,132,.2), 0 4px 12px rgba(0,0,0,.2); transform: scale(1.1); }
   .color-btn.completed { opacity: .6; cursor: not-allowed; }
   .color-btn.completed::before { display: none; }
-  .color-btn.completed::after { content: '✓'; position: absolute; top: 3px; right: 3px; background: #4CAF50; color: #fff; border-radius: 50%; width: 18px; height: 18px; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; }
+  /* numero multitono: marca de esquina (pinta en varios tonos) */
+  .color-btn.multitone::after { content: ''; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 16px 16px 0; border-color: transparent rgba(255,255,255,.85) transparent transparent; }
   .color-number { font-size: 1rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  /* animacion vanish al completar un numero */
+  @keyframes vanish { 60% { transform: scale(1.18); } 100% { transform: scale(0); opacity: 0; margin-left: -72px; } }
+  .color-btn.vanish { animation: vanish .4s ease forwards; pointer-events: none; }
+
+  /* seccion avanzada (oculta por defecto) */
+  .adv { margin-top: 16px; }
+  .adv summary { font-size: .75rem; color: #aaa; cursor: pointer; }
+  .backend { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .backend label { font-size: .7rem; color: #999; }
+  .backend input { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: .8rem; }
 
   #victory { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; z-index: 60; }
   #victory h2 { font-size: 2rem; margin-bottom: 10px; }
@@ -134,41 +145,20 @@
       <div class="drop" id="drop">
         <div class="big">📷</div>
         <div>Toca para elegir una foto</div>
-        <small>JPG / PNG · se procesa en el servidor</small>
+        <small>JPG / PNG · al terminar quedará igual que tu foto</small>
       </div>
       <input type="file" id="file" accept="image/*" hidden>
 
-      <div class="presets">
-        <button type="button" class="preset" data-preset="suave">Suave<small>pocas piezas</small></button>
-        <button type="button" class="preset selected" data-preset="equilibrado">Equilibrado<small>recomendado</small></button>
-        <button type="button" class="preset" data-preset="detallado">Detallado<small>más fiel</small></button>
-      </div>
-
-      <div class="row">
-        <div class="knob">
-          <label>Nº de colores <span class="val" id="v-colors">36</span></label>
-          <input type="range" id="n_colors" min="12" max="100" value="36">
-          <small>hasta 100 (más = más detalle de color)</small>
-        </div>
-        <div class="knob">
-          <label>Detalle <span class="val" id="v-area">0.13%</span></label>
-          <input type="range" id="min_area" min="2" max="60" value="13">
-          <small>menos = más detalle</small>
-        </div>
-      </div>
-      <div class="knob">
-        <label>Suavizado de bordes <span class="val" id="v-tol">1.8</span></label>
-        <input type="range" id="simplify" min="5" max="40" value="18">
-        <small>más = bordes más suaves/redondeados</small>
-      </div>
-
-      <div class="backend">
-        <label>API</label>
-        <input type="text" id="backend-url" value="http://localhost:8000">
-      </div>
-
       <button class="btn" id="generate" disabled>Generar</button>
       <div class="err" id="err"></div>
+
+      <details class="adv">
+        <summary>Avanzado</summary>
+        <div class="backend">
+          <label>API</label>
+          <input type="text" id="backend-url" value="http://localhost:8000">
+        </div>
+      </details>
     </div>
   </div>
 

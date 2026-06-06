@@ -34,14 +34,31 @@ def resize_longest(rgb: np.ndarray, longest: int) -> np.ndarray:
     return np.asarray(im)
 
 
-def smooth(rgb: np.ndarray, weight: float = 0.12) -> np.ndarray:
-    """Aplana gradientes y ruido preservando bordes (denoising TV).
+def smooth(rgb: np.ndarray, weight: float = 0.12, work: int = 640) -> np.ndarray:
+    """Aplana gradientes/ruido preservando bordes (denoising TV).
 
-    `weight` mayor => mas plano (mas regiones grandes); menor => mas detalle.
+    El TV produce zonas planas a trozos (el look "poster" limpio), pero es lento
+    a resolucion completa. Como el suavizado es de baja frecuencia, se hace a
+    resolucion reducida (`work`) y se reescala -> casi el mismo resultado en una
+    fraccion del tiempo.
     """
-    f = rgb.astype(np.float32) / 255.0
-    out = denoise_tv_chambolle(f, weight=weight, channel_axis=-1)
-    return (np.clip(out, 0.0, 1.0) * 255.0).astype(np.uint8)
+    h, w = rgb.shape[:2]
+    longest = max(h, w)
+    if longest > work:
+        scale = work / float(longest)
+        small = np.asarray(
+            Image.fromarray(rgb).resize(
+                (max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS
+            )
+        )
+    else:
+        small = rgb
+    f = small.astype(np.float32) / 255.0
+    den = denoise_tv_chambolle(f, weight=weight, channel_axis=-1)
+    den = (np.clip(den, 0.0, 1.0) * 255.0).astype(np.uint8)
+    if den.shape[:2] != (h, w):
+        den = np.asarray(Image.fromarray(den).resize((w, h), Image.LANCZOS))
+    return den
 
 
 def preprocess(file_bytes: bytes, process_size: int = 1200) -> np.ndarray:

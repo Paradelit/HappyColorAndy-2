@@ -5,21 +5,27 @@ viewBox="0 0 width height" del SVG haga el zoom trivial):
 
 {
   "version": 1, "width": W, "height": H,
-  "palette": [ {index, hex}, ... ],
-  "regions": [ {id, color, d, label:{x,y,size}|null}, ... ]
+  "palette": [ {index, hex, multitone, swatches:[...]}, ... ],
+  "regions": [ {id, color, fill, area, edge, d, label:{x,y,size}|null}, ... ]
 }
+
+  - color    = numero (grupo) que el jugador selecciona
+  - fill     = color real (fiel) con el que se rellena la region
+  - edge     = fuerza de borde 0..1 (grosor de linea / profundidad)
+  - multitone= si ese numero pinta en varios tonos (marca especial en paleta)
 """
 
 
-def assemble(width, height, palette, region_group, region_area, region_fill, paths, labels):
+def assemble(width, height, palette, region_group, region_area, region_fill, region_edge, paths, labels):
     regions = []
     for rid, d in paths.items():
         regions.append(
             {
                 "id": int(rid),
-                "color": int(region_group[rid]),                 # numero (grupo)
-                "fill": region_fill[rid],                        # color fiel real
+                "color": int(region_group[rid]),                       # numero (grupo)
+                "fill": region_fill[rid],                              # color fiel real
                 "area": int(region_area[rid]) if rid < len(region_area) else 0,
+                "edge": round(float(region_edge[rid]), 3) if rid < len(region_edge) else 0.0,
                 "d": d,
                 "label": labels.get(rid),
             }
@@ -30,6 +36,6 @@ def assemble(width, height, palette, region_group, region_area, region_fill, pat
         "version": 1,
         "width": int(width),
         "height": int(height),
-        "palette": [{"index": p["index"], "hex": p["hex"]} for p in palette],
+        "palette": palette,
         "regions": regions,
     }

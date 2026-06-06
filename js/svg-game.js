@@ -66,45 +66,7 @@ const SvgGame = {
       if (e.dataTransfer.files.length) { u.file.files = e.dataTransfer.files; this.onFilePicked(); }
     });
 
-    // sliders -> etiquetas
-    const bind = (id, fn) => { const el = document.getElementById(id); el.oninput = fn; fn(); };
-    bind('n_colors', () => document.getElementById('v-colors').textContent = document.getElementById('n_colors').value);
-    bind('min_area', () => document.getElementById('v-area').textContent =
-      (document.getElementById('min_area').value / 100).toFixed(2) + '%');
-    bind('simplify', () => document.getElementById('v-tol').textContent =
-      (document.getElementById('simplify').value / 10).toFixed(1));
-
-    // presets de calidad: ajustan los sliders + la limpieza de fronteras de golpe.
-    // clean = radio del filtro de mayoria (mas = fronteras mas limpias).
-    this.presets = {
-      suave:       { n_colors: 24, min_area: 22, simplify: 24, clean: 3 },
-      equilibrado: { n_colors: 36, min_area: 13, simplify: 18, clean: 2 },
-      detallado:   { n_colors: 56, min_area: 7,  simplify: 12, clean: 1 },
-    };
-    this.cleanRadius = this.presets.equilibrado.clean;
-    document.querySelectorAll('.preset').forEach(b => {
-      b.onclick = () => {
-        document.querySelectorAll('.preset').forEach(x => x.classList.remove('selected'));
-        b.classList.add('selected');
-        this.applyPreset(b.dataset.preset);
-      };
-    });
-
     u.generate.onclick = () => this.generate();
-  },
-
-  applyPreset(name) {
-    const p = this.presets[name];
-    if (!p) return;
-    const set = (id, val) => {
-      const el = document.getElementById(id);
-      el.value = val;
-      el.dispatchEvent(new Event('input')); // refresca la etiqueta del slider
-    };
-    set('n_colors', p.n_colors);
-    set('min_area', p.min_area);
-    set('simplify', p.simplify);
-    this.cleanRadius = p.clean;   // la limpieza no es slider, se manda aparte
   },
 
   onFilePicked() {
@@ -121,12 +83,9 @@ const SvgGame = {
     if (!f) return;
     const base = this.ui.backendUrl.value.replace(/\/$/, '');
 
+    // sin parametros: el backend auto-ajusta para maxima fidelidad
     const fd = new FormData();
     fd.append('file', f);
-    fd.append('n_colors', document.getElementById('n_colors').value);
-    fd.append('min_area_pct', (document.getElementById('min_area').value / 100).toString());
-    fd.append('simplify_tol', (document.getElementById('simplify').value / 10).toString());
-    fd.append('clean_radius', String(this.cleanRadius));
 
     this.ui.err.textContent = '';
     this.ui.loading.style.display = 'flex';
@@ -168,6 +127,13 @@ const SvgGame = {
     this.ui.gameView.style.display = 'flex';
     this.fitCamera(doc.width, doc.height);
     this.resumeProgress();      // retoma lo ya pintado de una sesion anterior
+    // quita (sin animacion) los numeros ya completados al retomar
+    this.colorRemaining.forEach((rem, i) => {
+      if (this.colorTotal[i] > 0 && rem <= 0) {
+        const b = document.getElementById('cbtn-' + i);
+        if (b) b.remove();
+      }
+    });
     this.selectFirstAvailable();
     this.updateProgress();
   },
@@ -182,6 +148,15 @@ const SvgGame = {
     svg.classList.remove('revealed');
     svg.innerHTML = '';
 
+    // patron de cuadricula gris para resaltar las zonas a pintar (Happy Color)
+    const defs = document.createElementNS(SVGNS, 'defs');
+    defs.innerHTML =
+      '<pattern id="checker" width="16" height="16" patternUnits="userSpaceOnUse">' +
+      '<rect width="16" height="16" fill="#ececf2"/>' +
+      '<rect width="8" height="8" fill="#ccd0db"/>' +
+      '<rect x="8" y="8" width="8" height="8" fill="#ccd0db"/></pattern>';
+    svg.appendChild(defs);
+
     const paths = document.createElementNS(SVGNS, 'g');
     const labels = document.createElementNS(SVGNS, 'g');
 
@@ -190,9 +165,9 @@ const SvgGame = {
       p.setAttribute('d', r.d);
       p.setAttribute('fill-rule', 'evenodd');
       p.setAttribute('vector-effect', 'non-scaling-stroke'); // grosor constante al hacer zoom
-      // grosor de linea variable segun el area (como Happy Color): areas grandes
-      // -> borde mas grueso; areas diminutas -> borde fino.
-      const sw = Math.max(0.7, Math.min(3.4, 0.6 + Math.sqrt(r.area || 0) / 38));
+      // grosor de linea segun la PROFUNDIDAD (fuerza de borde en el original):
+      // primer plano (bordes fuertes) -> linea gruesa; fondo (suave) -> fina.
+      const sw = Math.max(0.5, Math.min(3.6, 0.5 + (r.edge || 0) * 3.1));
       p.setAttribute('stroke-width', sw.toFixed(2));
       p.setAttribute('class', 'region');
       p.dataset.id = r.id;
@@ -330,10 +305,8 @@ const SvgGame = {
     (this.regionsByColor[colorIdx] || []).forEach(id => {
       const el = this.pathEls[id];
       if (el && !el.classList.contains('painted')) {
-        // tinte suave del color FIEL de cada region (anticipa el resultado real)
-        const r = this.regionsById[id];
-        el.style.fill = this.tint(r.fill || this.doc.palette[colorIdx].hex, 0.78);
-        el.classList.add('target');  // pulso (CSS)
+        el.style.fill = 'url(#checker)';  // cuadricula gris = "pinta aqui"
+        el.classList.add('target');
         this.targetEls.push(el);
       }
     });
@@ -401,7 +374,13 @@ const SvgGame = {
       const btn = document.createElement('div');
       btn.className = 'color-btn';
       btn.id = 'cbtn-' + i;
-      btn.style.setProperty('--btn-color', c.hex);
+      // multitono -> fondo en degradado de sus tonos (marca especial); plano -> solido
+      if (c.multitone && c.swatches && c.swatches.length > 1) {
+        btn.style.setProperty('--btn-color', `linear-gradient(135deg, ${c.swatches.join(', ')})`);
+        btn.classList.add('multitone');
+      } else {
+        btn.style.setProperty('--btn-color', c.hex);
+      }
       const isLight = (r * 0.299 + g * 0.587 + b * 0.114) > 186;
       btn.innerHTML = `<span class="color-number" style="color:${isLight ? '#333' : '#fff'}">${i + 1}</span>`;
       btn.onclick = () => { if (this.colorRemaining[i] > 0) this.selectColor(i); };
@@ -504,12 +483,21 @@ const SvgGame = {
 
   onColorCompleted(index) {
     this.vibrate([40, 40, 40]);
+    this.vanishColorBtn(index);  // el numero desaparece de la paleta (vanish)
     // avanzar al siguiente color con regiones pendientes (envuelve)
     const n = this.colorRemaining.length;
     for (let k = 1; k <= n; k++) {
       const i = (index + k) % n;
-      if (this.colorRemaining[i] > 0) { setTimeout(() => this.selectColor(i), 250); return; }
+      if (this.colorRemaining[i] > 0) { setTimeout(() => this.selectColor(i), 300); return; }
     }
+  },
+
+  // anima la salida del numero completado y lo quita de la paleta
+  vanishColorBtn(index) {
+    const btn = document.getElementById('cbtn-' + index);
+    if (!btn || btn.classList.contains('vanish')) return;
+    btn.classList.add('vanish');
+    btn.addEventListener('animationend', () => btn.remove(), { once: true });
   },
 
   updateProgress() {

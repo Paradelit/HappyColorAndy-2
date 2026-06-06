@@ -55,11 +55,11 @@ def health():
 @app.post("/generate")
 async def generate(
     file: UploadFile = File(...),
-    n_colors: int = Form(24),
-    min_area_pct: float = Form(0.1),
-    simplify_tol: float = Form(1.5),
+    n_colors: int = Form(36),
+    min_area_pct: float = Form(0.06),
+    simplify_tol: float = Form(1.6),
     process_size: int = Form(1200),
-    max_regions: int = Form(600),
+    max_regions: int = Form(1200),
     clean_radius: int = Form(2),
 ):
     data = await _read_image(file)
