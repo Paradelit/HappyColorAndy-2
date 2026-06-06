@@ -9,6 +9,7 @@ from .recolor import fills_and_groups, boundary_edge_strength, paint_clusters
 from .vectorize import vectorize
 from .labels import labels_for_regions
 from .serialize import assemble
+from .stylize import stylize as ai_stylize
 
 
 def generate_color_by_number(
@@ -19,14 +20,18 @@ def generate_color_by_number(
     process_size: int = 1300,
     max_regions: int = 5000,
     clean_radius: int = 1,
+    stylize: bool = False,
 ):
     """Ejecuta el pipeline y devuelve el dict JSON listo para el frontend.
 
-    Los valores por defecto buscan MAXIMA FIDELIDAD automaticamente (el usuario
-    no toca parametros). `n_colors` es el numero de NUMEROS de la paleta; la
-    fidelidad no depende de el, sino del color fiel por region.
+    Si `stylize` es True, primero convierte la foto en una ilustracion limpia con
+    IA (estilo Happy Color) y hace el color-by-number de esa ilustracion.
     """
     t0 = time.time()
+    stylized = False
+    if stylize:
+        file_bytes = ai_stylize(file_bytes)   # foto -> ilustracion (IA)
+        stylized = True
 
     rgb = preprocess(file_bytes, process_size=process_size)
     h, w = rgb.shape[:2]
@@ -56,6 +61,7 @@ def generate_color_by_number(
         "process_size": process_size,
         "max_regions": max_regions,
         "clean_radius": clean_radius,
+        "stylized": stylized,
         "n_regions": len(doc["regions"]),
         "elapsed_ms": int((time.time() - t0) * 1000),
     }

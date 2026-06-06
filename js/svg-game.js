@@ -37,6 +37,8 @@ const SvgGame = {
       generate: document.getElementById('generate'),
       err: document.getElementById('err'),
       backendUrl: document.getElementById('backend-url'),
+      aiToggle: document.getElementById('ai-toggle'),
+      stylize: document.getElementById('stylize'),
       loading: document.getElementById('loading-overlay'),
       loadingText: document.getElementById('loading-text'),
       viewport: document.getElementById('viewport'),
@@ -67,6 +69,21 @@ const SvgGame = {
     });
 
     u.generate.onclick = () => this.generate();
+
+    // muestra el modo IA solo si el backend tiene la clave configurada
+    this.checkCapabilities();
+    u.backendUrl.addEventListener('change', () => this.checkCapabilities());
+  },
+
+  async checkCapabilities() {
+    const base = this.ui.backendUrl.value.replace(/\/$/, '');
+    try {
+      const res = await fetch(base + '/capabilities');
+      const cap = await res.json();
+      this.ui.aiToggle.hidden = !cap.stylize;
+    } catch (e) {
+      this.ui.aiToggle.hidden = true;  // backend no disponible aun
+    }
   },
 
   onFilePicked() {
@@ -84,10 +101,13 @@ const SvgGame = {
     const base = this.ui.backendUrl.value.replace(/\/$/, '');
 
     // sin parametros: el backend auto-ajusta para maxima fidelidad
+    const useAi = this.ui.stylize && this.ui.stylize.checked && !this.ui.aiToggle.hidden;
     const fd = new FormData();
     fd.append('file', f);
+    if (useAi) fd.append('stylize', 'true');
 
     this.ui.err.textContent = '';
+    this.ui.loadingText.textContent = useAi ? 'Creando ilustración con IA…' : 'Generando tu obra…';
     this.ui.loading.style.display = 'flex';
     try {
       const res = await fetch(base + '/generate', { method: 'POST', body: fd });

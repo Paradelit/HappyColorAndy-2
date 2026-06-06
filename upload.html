@@ -50,6 +50,11 @@
   .backend input { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: .8rem; }
   .backend label { font-size: .7rem; color: #999; }
 
+  .ai-toggle { display: flex; align-items: center; gap: 10px; background: #f4f1ff; border: 1px solid #e2dcf7; border-radius: 12px; padding: 12px; margin-bottom: 14px; cursor: pointer; }
+  .ai-toggle input { width: 20px; height: 20px; accent-color: #764ba2; flex: 0 0 auto; }
+  .ai-toggle span { display: flex; flex-direction: column; font-size: .85rem; color: #553; }
+  .ai-toggle small { color: #998; font-size: .72rem; margin-top: 2px; }
+
   .btn {
     width: 100%; border: none; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 700;
     color: #fff; background: #d63384; cursor: pointer; transition: .15s;
@@ -148,6 +153,11 @@
         <small>JPG / PNG · al terminar quedará igual que tu foto</small>
       </div>
       <input type="file" id="file" accept="image/*" hidden>
+
+      <label class="ai-toggle" id="ai-toggle" hidden>
+        <input type="checkbox" id="stylize">
+        <span><b>✨ Convertir en ilustración (IA)</b><small>foto → dibujo limpio estilo Happy Color · tarda más y tiene coste</small></span>
+      </label>
 
       <button class="btn" id="generate" disabled>Generar</button>
       <div class="err" id="err"></div>

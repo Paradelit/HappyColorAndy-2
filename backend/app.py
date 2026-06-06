@@ -23,6 +23,7 @@ from pipeline.runner import generate_color_by_number
 from pipeline.preprocess import preprocess
 from pipeline.quantize import quantize
 from pipeline.segment import segment
+from pipeline.stylize import stylize_available
 
 app = FastAPI(title="HappyColor Foto -> SVG", version="1.0")
 
@@ -52,6 +53,12 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/capabilities")
+def capabilities():
+    """Le dice al frontend que funciones extra estan disponibles."""
+    return {"stylize": stylize_available()}
+
+
 @app.post("/generate")
 async def generate(
     file: UploadFile = File(...),
@@ -61,8 +68,14 @@ async def generate(
     process_size: int = Form(1300),
     max_regions: int = Form(5000),
     clean_radius: int = Form(1),
+    stylize: bool = Form(False),
 ):
     data = await _read_image(file)
+    if stylize and not stylize_available():
+        raise HTTPException(
+            status_code=400,
+            detail="Modo ilustracion (IA) no configurado: define STYLIZE_API_KEY en el backend.",
+        )
     try:
         doc = generate_color_by_number(
             data,
@@ -72,7 +85,10 @@ async def generate(
             process_size=int(process_size),
             max_regions=int(max_regions),
             clean_radius=int(clean_radius),
+            stylize=bool(stylize),
         )
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001 - PoC: superficie de error simple
         raise HTTPException(status_code=500, detail=f"Error procesando imagen: {exc}")
     return doc
