@@ -56,11 +56,11 @@ def health():
 async def generate(
     file: UploadFile = File(...),
     n_colors: int = Form(36),
-    min_area_pct: float = Form(0.06),
-    simplify_tol: float = Form(1.6),
-    process_size: int = Form(1200),
-    max_regions: int = Form(1200),
-    clean_radius: int = Form(2),
+    min_area_pct: float = Form(0.02),
+    simplify_tol: float = Form(1.4),
+    process_size: int = Form(1300),
+    max_regions: int = Form(5000),
+    clean_radius: int = Form(1),
 ):
     data = await _read_image(file)
     try:

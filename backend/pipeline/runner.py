@@ -14,11 +14,11 @@ from .serialize import assemble
 def generate_color_by_number(
     file_bytes: bytes,
     n_colors: int = 36,
-    min_area_pct: float = 0.06,
-    simplify_tol: float = 1.6,
-    process_size: int = 1200,
-    max_regions: int = 1200,
-    clean_radius: int = 2,
+    min_area_pct: float = 0.02,
+    simplify_tol: float = 1.4,
+    process_size: int = 1300,
+    max_regions: int = 5000,
+    clean_radius: int = 1,
 ):
     """Ejecuta el pipeline y devuelve el dict JSON listo para el frontend.
 
@@ -32,7 +32,7 @@ def generate_color_by_number(
     h, w = rgb.shape[:2]
 
     # Cuantizacion FINA para formar regiones detalladas (no es la paleta final).
-    fine_colors = int(min(96, max(n_colors * 2, 64)))
+    fine_colors = int(min(120, max(n_colors * 3, 96)))
     label_image, fine_palette = quantize(rgb, n_colors=fine_colors, clean_radius=clean_radius)
     region_map, _fine_color, region_area = segment(
         label_image, fine_palette, min_area_pct=min_area_pct, max_regions=max_regions

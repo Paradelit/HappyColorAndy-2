@@ -8,7 +8,7 @@ disenado" que buscamos antes de cuantizar; sustituye al mean-shift de OpenCV.
 
 import numpy as np
 from PIL import Image, ImageOps
-from skimage.restoration import denoise_tv_chambolle
+from scipy.ndimage import median_filter
 
 
 def load_rgb(file_bytes: bytes) -> np.ndarray:
@@ -34,31 +34,15 @@ def resize_longest(rgb: np.ndarray, longest: int) -> np.ndarray:
     return np.asarray(im)
 
 
-def smooth(rgb: np.ndarray, weight: float = 0.12, work: int = 640) -> np.ndarray:
-    """Aplana gradientes/ruido preservando bordes (denoising TV).
+def smooth(rgb: np.ndarray, size: int = 3) -> np.ndarray:
+    """Quita ruido/speckle PRESERVANDO el detalle (filtro de mediana ligero).
 
-    El TV produce zonas planas a trozos (el look "poster" limpio), pero es lento
-    a resolucion completa. Como el suavizado es de baja frecuencia, se hace a
-    resolucion reducida (`work`) y se reescala -> casi el mismo resultado en una
-    fraccion del tiempo.
+    A diferencia del denoising TV (que aplanaba y "derretia" el detalle), la
+    mediana mantiene los bordes y los rasgos finos -> el resultado final se
+    parece mucho mas al original. La limpieza de fronteras la hace luego el
+    filtro de mayoria sobre las etiquetas.
     """
-    h, w = rgb.shape[:2]
-    longest = max(h, w)
-    if longest > work:
-        scale = work / float(longest)
-        small = np.asarray(
-            Image.fromarray(rgb).resize(
-                (max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS
-            )
-        )
-    else:
-        small = rgb
-    f = small.astype(np.float32) / 255.0
-    den = denoise_tv_chambolle(f, weight=weight, channel_axis=-1)
-    den = (np.clip(den, 0.0, 1.0) * 255.0).astype(np.uint8)
-    if den.shape[:2] != (h, w):
-        den = np.asarray(Image.fromarray(den).resize((w, h), Image.LANCZOS))
-    return den
+    return median_filter(rgb, size=(size, size, 1))
 
 
 def preprocess(file_bytes: bytes, process_size: int = 1200) -> np.ndarray:
