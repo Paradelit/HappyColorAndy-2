@@ -74,12 +74,14 @@ const SvgGame = {
     bind('simplify', () => document.getElementById('v-tol').textContent =
       (document.getElementById('simplify').value / 10).toFixed(1));
 
-    // presets de calidad: ajustan los 3 sliders de golpe (valores en unidades de slider)
+    // presets de calidad: ajustan los sliders + la limpieza de fronteras de golpe.
+    // clean = radio del filtro de mayoria (mas = fronteras mas limpias).
     this.presets = {
-      suave:       { n_colors: 20, min_area: 22, simplify: 24 },
-      equilibrado: { n_colors: 32, min_area: 12, simplify: 16 },
-      detallado:   { n_colors: 60, min_area: 6,  simplify: 11 },
+      suave:       { n_colors: 24, min_area: 22, simplify: 24, clean: 3 },
+      equilibrado: { n_colors: 36, min_area: 13, simplify: 18, clean: 2 },
+      detallado:   { n_colors: 56, min_area: 7,  simplify: 12, clean: 1 },
     };
+    this.cleanRadius = this.presets.equilibrado.clean;
     document.querySelectorAll('.preset').forEach(b => {
       b.onclick = () => {
         document.querySelectorAll('.preset').forEach(x => x.classList.remove('selected'));
@@ -102,6 +104,7 @@ const SvgGame = {
     set('n_colors', p.n_colors);
     set('min_area', p.min_area);
     set('simplify', p.simplify);
+    this.cleanRadius = p.clean;   // la limpieza no es slider, se manda aparte
   },
 
   onFilePicked() {
@@ -123,6 +126,7 @@ const SvgGame = {
     fd.append('n_colors', document.getElementById('n_colors').value);
     fd.append('min_area_pct', (document.getElementById('min_area').value / 100).toString());
     fd.append('simplify_tol', (document.getElementById('simplify').value / 10).toString());
+    fd.append('clean_radius', String(this.cleanRadius));
 
     this.ui.err.textContent = '';
     this.ui.loading.style.display = 'flex';
@@ -185,7 +189,11 @@ const SvgGame = {
       const p = document.createElementNS(SVGNS, 'path');
       p.setAttribute('d', r.d);
       p.setAttribute('fill-rule', 'evenodd');
-      p.setAttribute('vector-effect', 'non-scaling-stroke'); // bordes finos a cualquier zoom
+      p.setAttribute('vector-effect', 'non-scaling-stroke'); // grosor constante al hacer zoom
+      // grosor de linea variable segun el area (como Happy Color): areas grandes
+      // -> borde mas grueso; areas diminutas -> borde fino.
+      const sw = Math.max(0.7, Math.min(3.4, 0.6 + Math.sqrt(r.area || 0) / 38));
+      p.setAttribute('stroke-width', sw.toFixed(2));
       p.setAttribute('class', 'region');
       p.dataset.id = r.id;
       p.dataset.color = r.color;
