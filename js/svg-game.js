@@ -197,7 +197,7 @@ const SvgGame = {
       p.setAttribute('class', 'region');
       p.dataset.id = r.id;
       p.dataset.color = r.color;
-      p.addEventListener('click', () => this.onRegionClick(r, p));
+      p.addEventListener('click', (e) => this.onRegionClick(r, p, e));
       paths.appendChild(p);
       this.pathEls[r.id] = p;
       this.regionsById[r.id] = r;
@@ -222,23 +222,30 @@ const SvgGame = {
   },
 
   // ---------- pintado por region ----------
-  onRegionClick(r, pathEl) {
+  onRegionClick(r, pathEl, e) {
     if (this.state.hasMov) return;            // fue arrastre/pinch, no pintar
     if (pathEl.classList.contains('painted')) return;
     if (r.color !== this.state.selectedColor) { this.shake(); return; }
-    this.paint(r, pathEl, { feedback: true });
+    const pt = e ? this.eventToSvg(e) : null;  // punto de origen de la animacion
+    this.paint(r, pathEl, { feedback: true, animate: true, point: pt });
   },
 
-  // Pinta una region (sin comprobar el color seleccionado). Reusado por click,
-  // varita magica y al retomar progreso. opts.feedback => vibra + sonidos +
-  // avanza de color + comprueba victoria.
+  // Pinta una region con su color FIEL (no el color del numero). Reusado por
+  // click, varita magica y al retomar. opts.animate => efecto de expansion.
   paint(r, pathEl, opts = {}) {
     if (pathEl.classList.contains('painted')) return;
-    pathEl.style.fill = this.doc.palette[r.color].hex; // inline gana a la CSS
+    const hex = r.fill || this.doc.palette[r.color].hex; // color real de la region
     pathEl.classList.remove('target');
     pathEl.classList.add('painted');
     const lbl = this.labelEls[r.id];
     if (lbl) lbl.classList.add('hidden');     // el numero desaparece al pintar
+
+    if (opts.animate && opts.point) {
+      this.animateFill(r, pathEl, hex, opts.point);  // expansion desde el clic
+    } else {
+      pathEl.style.fill = hex;                        // instantaneo (wand/retomar)
+    }
+
     this.state.paintedCount++;
     this.colorRemaining[r.color]--;
     this.updateColorBtn(r.color);
@@ -252,6 +259,63 @@ const SvgGame = {
     this.saveProgress();
   },
 
+  // Efecto de "pintado": un circulo del color crece desde el punto pulsado,
+  // recortado a la forma de la region, hasta cubrirla.
+  animateFill(r, pathEl, hex, pt) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const cid = 'clip-' + r.id;
+    const clip = document.createElementNS(NS, 'clipPath');
+    clip.id = cid;
+    clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+    const cpath = document.createElementNS(NS, 'path');
+    cpath.setAttribute('d', r.d);
+    cpath.setAttribute('fill-rule', 'evenodd');
+    clip.appendChild(cpath);
+
+    const circ = document.createElementNS(NS, 'circle');
+    circ.setAttribute('cx', pt.x);
+    circ.setAttribute('cy', pt.y);
+    circ.setAttribute('r', 0);
+    circ.setAttribute('fill', hex);
+    circ.setAttribute('clip-path', `url(#${cid})`);
+    circ.setAttribute('pointer-events', 'none');
+
+    this.ui.svg.appendChild(clip);
+    this.ui.svg.appendChild(circ);
+
+    // radio final = distancia del punto a la esquina mas lejana del bounding box
+    const bb = pathEl.getBBox();
+    const maxR = Math.hypot(
+      Math.max(pt.x - bb.x, bb.x + bb.width - pt.x),
+      Math.max(pt.y - bb.y, bb.y + bb.height - pt.y)
+    ) + 2;
+
+    const dur = 300, t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur);
+      circ.setAttribute('r', maxR * (1 - (1 - k) * (1 - k))); // ease-out
+      if (k < 1) {
+        requestAnimationFrame(step);
+      } else {
+        pathEl.style.fill = hex;   // fija el color y retira lo temporal
+        circ.remove(); clip.remove();
+      }
+    };
+    requestAnimationFrame(step);
+  },
+
+  // convierte coords de pantalla (evento) a coords del SVG (espacio-imagen),
+  // deshaciendo nuestra propia transformacion (pX, pY, scale).
+  eventToSvg(e) {
+    const cx = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX);
+    const cy = (e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY);
+    const rect = this.ui.viewport.getBoundingClientRect();
+    return {
+      x: (cx - rect.left - this.state.pX) / this.state.scale,
+      y: (cy - rect.top - this.state.pY) / this.state.scale,
+    };
+  },
+
   // ---------- resaltado de las regiones del color seleccionado ----------
   clearTargets() {
     this.targetEls.forEach(el => {
@@ -263,11 +327,12 @@ const SvgGame = {
 
   highlightTargets(colorIdx) {
     this.clearTargets();
-    const tintHex = this.tint(this.doc.palette[colorIdx].hex, 0.78);
     (this.regionsByColor[colorIdx] || []).forEach(id => {
       const el = this.pathEls[id];
       if (el && !el.classList.contains('painted')) {
-        el.style.fill = tintHex;     // pista de color suave
+        // tinte suave del color FIEL de cada region (anticipa el resultado real)
+        const r = this.regionsById[id];
+        el.style.fill = this.tint(r.fill || this.doc.palette[colorIdx].hex, 0.78);
         el.classList.add('target');  // pulso (CSS)
         this.targetEls.push(el);
       }
@@ -407,6 +472,30 @@ const SvgGame = {
 
   fit() { if (this.doc) this.fitCamera(this.doc.width, this.doc.height); },
 
+  // ---------- LOD: mostrar/ocultar numeros y bordes segun el zoom ----------
+  // Cada region/numero tiene un tamano aparente en pantalla = tamano * escala.
+  // Si es demasiado pequeno para leerse/verse, se oculta; reaparece al acercar.
+  scheduleLOD() {
+    clearTimeout(this._lodTimer);
+    this._lodTimer = setTimeout(() => this.applyLOD(), 90);
+  },
+
+  applyLOD() {
+    if (!this.doc) return;
+    const s = this.state.scale;
+    const MIN_LABEL_PX = 7;    // un numero mas pequeno que esto no se lee
+    const MIN_REGION_PX = 2.5; // un borde de region mas fino que esto estorba
+    for (const id in this.regionsById) {
+      const r = this.regionsById[id];
+      const el = this.pathEls[id];
+      if (el) el.classList.toggle('lod', Math.sqrt(r.area || 0) * s < MIN_REGION_PX);
+      const lbl = this.labelEls[id];
+      if (lbl && !lbl.classList.contains('hidden')) {
+        lbl.classList.toggle('lod', !(r.label && r.label.size * s >= MIN_LABEL_PX));
+      }
+    }
+  },
+
   selectFirstAvailable() {
     for (let i = 0; i < this.colorRemaining.length; i++) {
       if (this.colorRemaining[i] > 0) { this.selectColor(i); return; }
@@ -458,6 +547,7 @@ const SvgGame = {
   updateTransform() {
     this.ui.zoomLayer.style.transform =
       `translate(${this.state.pX}px, ${this.state.pY}px) scale(${this.state.scale})`;
+    this.scheduleLOD();   // recalcula visibilidad de numeros/bordes (debounced)
   },
 
   updateTransformThrottled() {

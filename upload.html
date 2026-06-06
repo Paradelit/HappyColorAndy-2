@@ -84,6 +84,9 @@
 
   .region { fill: #fafafa; stroke: #2e2e2e; stroke-width: 1; stroke-linejoin: round; cursor: pointer; }
   .region.painted { stroke-opacity: .45; }
+  /* LOD: al alejar se ocultan bordes/numeros de regiones diminutas */
+  .region.lod { stroke-opacity: 0; }
+  .rlabel.lod { display: none; }
   /* regiones del color seleccionado: tinte (inline) + pulso suave */
   .region.target { animation: targetPulse 1.5s ease-in-out infinite; }
   @keyframes targetPulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
