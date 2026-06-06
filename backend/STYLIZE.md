@@ -8,27 +8,27 @@ color-by-number de esa ilustración.
 Es **opcional**: el backend funciona sin esto (pipeline normal). Solo se activa
 si configuras una clave de API.
 
-## Activarlo (proveedor por defecto: OpenAI)
+## Opción recomendada: Google Gemini (free tier generoso) 🆓
 
-1. Consigue una API key de OpenAI: https://platform.openai.com/api-keys
-   (tiene coste por imagen, unos pocos céntimos; las imágenes se envían a OpenAI).
+1. Consigue una API key **gratis** en Google AI Studio:
+   https://aistudio.google.com/apikey
 
-2. Instala la dependencia (ya está en requirements.txt):
-   ```
-   pip install -r requirements.txt
+2. Instala la dependencia:
+   ```bash
+   pip install google-genai
    ```
 
 3. Define la variable de entorno antes de arrancar el backend:
 
    **Git Bash (Windows):**
    ```bash
-   export STYLIZE_API_KEY="sk-...tu_clave..."
+   export STYLIZE_API_KEY="tu_clave_de_google"
    python -m uvicorn app:app --reload --port 8000
    ```
 
    **PowerShell:**
    ```powershell
-   $env:STYLIZE_API_KEY="sk-...tu_clave..."
+   $env:STYLIZE_API_KEY="tu_clave_de_google"
    python -m uvicorn app:app --reload --port 8000
    ```
 
@@ -37,19 +37,27 @@ si configuras una clave de API.
 
 ## Variables de entorno
 
-| Variable           | Por defecto    | Para qué |
-|--------------------|----------------|----------|
-| `STYLIZE_API_KEY`  | (vacío)        | Activa el modo. Obligatoria. |
-| `STYLIZE_PROVIDER` | `openai`       | Proveedor de estilizado. |
-| `STYLIZE_MODEL`    | `gpt-image-1`  | Modelo de imagen (OpenAI). |
+| Variable           | Por defecto              | Para qué |
+|--------------------|--------------------------|----------|
+| `STYLIZE_API_KEY`  | (vacío)                  | Activa el modo. Obligatoria. |
+| `STYLIZE_PROVIDER` | `gemini`                 | `gemini` (gratis) o `openai` (de pago). |
+| `STYLIZE_MODEL`    | según proveedor          | Gemini: `gemini-2.5-flash-image` · OpenAI: `gpt-image-1` |
+
+## Alternativa: OpenAI (de pago)
+
+```bash
+pip install openai
+export STYLIZE_PROVIDER="openai"
+export STYLIZE_API_KEY="sk-...tu_clave..."
+```
 
 ## Ajustar el resultado
 
 El "prompt" que convierte la foto está en `pipeline/stylize.py` (constante
 `PROMPT`). Si las ilustraciones salen poco limpias o poco fieles, ahí se ajusta.
 
-## Otros proveedores
+## Más proveedores
 
-`stylize.py` está preparado para añadir más proveedores (p. ej. Replicate con
-modelos de line-art/cartoon, que suelen dar contornos aún más limpios). Añade
-una función `_stylize_<proveedor>` y un caso en `stylize()`.
+`stylize.py` está preparado para añadir proveedores (p. ej. Hugging Face o
+Replicate con modelos de line-art/cartoon). Añade una función
+`_stylize_<proveedor>` y un caso en `stylize()`.

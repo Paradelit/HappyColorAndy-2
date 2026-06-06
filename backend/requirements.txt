@@ -9,5 +9,6 @@ scikit-learn>=1.4
 numpy>=1.26
 scipy>=1.11
 shapely>=2.0
-# Opcional: modo "ilustracion (IA)" foto->dibujo. Solo se usa si defines STYLIZE_API_KEY.
-openai>=1.40
+# Opcional: modo "ilustracion (IA)" foto->dibujo. Instala solo si lo vas a usar:
+#   Gemini (gratis):  pip install google-genai
+#   OpenAI (de pago): pip install openai
