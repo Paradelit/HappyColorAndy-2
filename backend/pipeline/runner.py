@@ -5,7 +5,7 @@ import time
 from .preprocess import preprocess
 from .quantize import quantize
 from .segment import segment
-from .recolor import fills_and_groups, boundary_edge_strength
+from .recolor import fills_and_groups, boundary_edge_strength, paint_clusters
 from .vectorize import vectorize
 from .labels import labels_for_regions
 from .serialize import assemble
@@ -42,11 +42,12 @@ def generate_color_by_number(
     # Color fiel por region + agrupacion en numeros + fuerza de borde (profundidad).
     fills, groups, palette = fills_and_groups(region_map, n_regions, rgb, n_groups=n_colors)
     edge = boundary_edge_strength(region_map, n_regions, rgb)
+    clusters = paint_clusters(region_map, n_regions, groups)  # un clic = todo el grupo contiguo
 
     paths = vectorize(region_map, n_regions, simplify_tol=simplify_tol)
     labels = labels_for_regions(region_map, n_regions)
 
-    doc = assemble(w, h, palette, groups, region_area, fills, edge, paths, labels)
+    doc = assemble(w, h, palette, groups, region_area, fills, edge, clusters, paths, labels)
     doc["meta"] = {
         "n_colors": n_colors,
         "fine_colors": fine_colors,

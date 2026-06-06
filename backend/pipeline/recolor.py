@@ -93,3 +93,58 @@ def fills_and_groups(region_map, n_regions, rgb, n_groups, seed=42):
         })
 
     return fills, groups.tolist(), palette
+
+
+def paint_clusters(region_map, n_regions, groups):
+    """Agrupa regiones CONTIGUAS del mismo numero en un mismo "cluster".
+
+    Asi un solo clic pinta todas las regiones contiguas que comparten numero
+    (cada una con su tono fiel), en vez de exigir un clic por region. Regiones
+    del mismo numero pero NO contiguas quedan en clusters distintos.
+
+    Returns: list[int] -> id de cluster (contiguo) por region.
+    """
+    groups = np.asarray(groups)
+    parent = list(range(n_regions))
+
+    def find(x):
+        root = x
+        while parent[root] != root:
+            root = parent[root]
+        while parent[x] != root:
+            parent[x], x = root, parent[x]
+        return root
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    # Pares de regiones vecinas (unicos) -> unir si comparten numero.
+    def neighbor_pairs(a, b):
+        m = a != b
+        if not m.any():
+            return np.empty(0, np.int64), np.empty(0, np.int64)
+        lo = np.minimum(a[m], b[m]).astype(np.int64)
+        hi = np.maximum(a[m], b[m]).astype(np.int64)
+        key = np.unique(lo * (n_regions + 1) + hi)
+        return key // (n_regions + 1), key % (n_regions + 1)
+
+    rm = region_map
+    for a, b in (
+        neighbor_pairs(rm[:, :-1].ravel(), rm[:, 1:].ravel()),
+        neighbor_pairs(rm[:-1, :].ravel(), rm[1:, :].ravel()),
+    ):
+        for ra, rb in zip(a, b):
+            if groups[ra] == groups[rb]:
+                union(int(ra), int(rb))
+
+    # Ids de cluster contiguos.
+    remap = {}
+    clusters = []
+    for i in range(n_regions):
+        r = find(i)
+        if r not in remap:
+            remap[r] = len(remap)
+        clusters.append(remap[r])
+    return clusters

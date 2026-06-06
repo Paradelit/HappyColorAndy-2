@@ -16,13 +16,14 @@ viewBox="0 0 width height" del SVG haga el zoom trivial):
 """
 
 
-def assemble(width, height, palette, region_group, region_area, region_fill, region_edge, paths, labels):
+def assemble(width, height, palette, region_group, region_area, region_fill, region_edge, region_cluster, paths, labels):
     regions = []
     for rid, d in paths.items():
         regions.append(
             {
                 "id": int(rid),
                 "color": int(region_group[rid]),                       # numero (grupo)
+                "cluster": int(region_cluster[rid]),                   # un clic pinta todo el cluster
                 "fill": region_fill[rid],                              # color fiel real
                 "area": int(region_area[rid]) if rid < len(region_area) else 0,
                 "edge": round(float(region_edge[rid]), 3) if rid < len(region_edge) else 0.0,

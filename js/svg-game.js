@@ -115,6 +115,8 @@ const SvgGame = {
     this.labelEls = {};
     this.regionsById = {};
     this.regionsByColor = {};
+    this.regionsByCluster = {};   // cluster id -> [region ids] (un clic pinta todo)
+    this.clusterColor = {};       // cluster id -> numero
     this.targetEls = [];
     this.state.paintedCount = 0;
     this.state.totalRegions = doc.regions.length;
@@ -177,6 +179,9 @@ const SvgGame = {
       this.pathEls[r.id] = p;
       this.regionsById[r.id] = r;
       (this.regionsByColor[r.color] = this.regionsByColor[r.color] || []).push(r.id);
+      const cl = (r.cluster === undefined ? r.id : r.cluster);
+      (this.regionsByCluster[cl] = this.regionsByCluster[cl] || []).push(r.id);
+      this.clusterColor[cl] = r.color;
       this.colorTotal[r.color]++;
       this.colorRemaining[r.color]++;
 
@@ -202,7 +207,25 @@ const SvgGame = {
     if (pathEl.classList.contains('painted')) return;
     if (r.color !== this.state.selectedColor) { this.shake(); return; }
     const pt = e ? this.eventToSvg(e) : null;  // punto de origen de la animacion
-    this.paint(r, pathEl, { feedback: true, animate: true, point: pt });
+    // un solo clic pinta TODO el cluster contiguo (cada region con su tono)
+    const cl = (r.cluster === undefined ? r.id : r.cluster);
+    this.paintCluster(cl, pt, true);
+  },
+
+  // Pinta todas las regiones (sin pintar) de un cluster en una sola accion.
+  paintCluster(cluster, point, withFeedback) {
+    const ids = (this.regionsByCluster[cluster] || [])
+      .filter(id => !this.pathEls[id].classList.contains('painted'));
+    if (!ids.length) return;
+    ids.forEach(id => this.paint(this.regionsById[id], this.pathEls[id],
+      { feedback: false, animate: !!point, point }));
+    if (withFeedback) {
+      this.vibrate(30);
+      const color = this.clusterColor[cluster];
+      if (this.colorRemaining[color] === 0) this.onColorCompleted(color);
+      if (this.state.paintedCount === this.state.totalRegions) this.triggerVictory();
+    }
+    this.saveProgress();
   },
 
   // Pinta una region con su color FIEL (no el color del numero). Reusado por
