@@ -34,7 +34,7 @@ def resize_longest(rgb: np.ndarray, longest: int) -> np.ndarray:
     return np.asarray(im)
 
 
-def smooth(rgb: np.ndarray, weight: float = 0.1) -> np.ndarray:
+def smooth(rgb: np.ndarray, weight: float = 0.12) -> np.ndarray:
     """Aplana gradientes y ruido preservando bordes (denoising TV).
 
     `weight` mayor => mas plano (mas regiones grandes); menor => mas detalle.

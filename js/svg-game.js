@@ -74,7 +74,34 @@ const SvgGame = {
     bind('simplify', () => document.getElementById('v-tol').textContent =
       (document.getElementById('simplify').value / 10).toFixed(1));
 
+    // presets de calidad: ajustan los 3 sliders de golpe (valores en unidades de slider)
+    this.presets = {
+      suave:       { n_colors: 20, min_area: 22, simplify: 24 },
+      equilibrado: { n_colors: 32, min_area: 12, simplify: 16 },
+      detallado:   { n_colors: 60, min_area: 6,  simplify: 11 },
+    };
+    document.querySelectorAll('.preset').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('.preset').forEach(x => x.classList.remove('selected'));
+        b.classList.add('selected');
+        this.applyPreset(b.dataset.preset);
+      };
+    });
+
     u.generate.onclick = () => this.generate();
+  },
+
+  applyPreset(name) {
+    const p = this.presets[name];
+    if (!p) return;
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      el.value = val;
+      el.dispatchEvent(new Event('input')); // refresca la etiqueta del slider
+    };
+    set('n_colors', p.n_colors);
+    set('min_area', p.min_area);
+    set('simplify', p.simplify);
   },
 
   onFilePicked() {
