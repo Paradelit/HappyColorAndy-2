@@ -112,14 +112,18 @@ const SvgGame = {
     try {
       const res = await fetch(base + '/generate', { method: 'POST', body: fd });
       if (!res.ok) {
-        const t = await res.text();
-        throw new Error('HTTP ' + res.status + ' · ' + t.slice(0, 160));
+        let detail;
+        try { detail = (await res.json()).detail; } catch (_) { detail = await res.text(); }
+        throw new Error('HTTP ' + res.status + ' · ' + (detail || '').slice(0, 600));
       }
       const doc = await res.json();
       this.loadDoc(doc);
     } catch (e) {
-      this.ui.err.textContent = 'No se pudo generar: ' + e.message +
-        ' — ¿está el backend en marcha y la URL es correcta?';
+      // error de red (no respondio el server) vs error devuelto por el server
+      const isNetwork = (e instanceof TypeError);
+      this.ui.err.textContent = isNetwork
+        ? 'No se pudo conectar con el backend. ¿Está uvicorn en marcha y la URL es correcta?'
+        : 'No se pudo generar: ' + e.message;
     } finally {
       this.ui.loading.style.display = 'none';
     }
