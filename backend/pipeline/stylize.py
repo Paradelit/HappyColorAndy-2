@@ -73,7 +73,9 @@ def _stylize_gemini(image_bytes: bytes) -> bytes:
         )
 
     client = genai.Client(api_key=os.environ["STYLIZE_API_KEY"])
-    model = os.environ.get("STYLIZE_MODEL", "gemini-2.5-flash-image")
+    # "Nano Banana" preview: tiene cuota diaria GRATIS (~2000/dia). La version GA
+    # (gemini-2.5-flash-image) requiere facturacion -> da 429 en free tier.
+    model = os.environ.get("STYLIZE_MODEL", "gemini-2.5-flash-image-preview")
 
     # Normaliza a PNG para enviar.
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")

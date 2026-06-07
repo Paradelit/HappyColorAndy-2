@@ -37,11 +37,16 @@ si configuras una clave de API.
 
 ## Variables de entorno
 
-| Variable           | Por defecto              | Para qué |
-|--------------------|--------------------------|----------|
-| `STYLIZE_API_KEY`  | (vacío)                  | Activa el modo. Obligatoria. |
-| `STYLIZE_PROVIDER` | `gemini`                 | `gemini` (gratis) o `openai` (de pago). |
-| `STYLIZE_MODEL`    | según proveedor          | Gemini: `gemini-2.5-flash-image` · OpenAI: `gpt-image-1` |
+| Variable           | Por defecto                      | Para qué |
+|--------------------|----------------------------------|----------|
+| `STYLIZE_API_KEY`  | (vacío)                          | Activa el modo. Obligatoria. |
+| `STYLIZE_PROVIDER` | `gemini`                         | `gemini` (gratis) o `openai` (de pago). |
+| `STYLIZE_MODEL`    | `gemini-2.5-flash-image-preview` | "Nano Banana" preview: ~2000 imágenes/día GRATIS. |
+
+> ⚠️ Usa el modelo **`-preview`** (Nano Banana). La versión GA
+> `gemini-2.5-flash-image` requiere facturación y da error 429 en el free tier.
+> Otras opciones gratis con menos cuota: `gemini-3.1-flash-image` (Nano Banana 2,
+> ~1000/día). Se cambian con `export STYLIZE_MODEL="..."`.
 
 ## Alternativa: OpenAI (de pago)
 
