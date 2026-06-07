@@ -12,13 +12,33 @@
 
   /* ---------- Vista de subida ---------- */
   #upload-view {
-    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex: 1; display: none; align-items: center; justify-content: center;
     background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; overflow-y: auto;
   }
   .card {
     background: #fff; border-radius: 20px; padding: 28px; width: 100%; max-width: 440px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    box-shadow: 0 20px 60px rgba(0,0,0,.3); position: relative;
   }
+  .card-back { position: absolute; top: 16px; left: 16px; width: 36px; height: 36px; border: none; border-radius: 50%; background: #f0f0f4; font-size: 1.1rem; cursor: pointer; }
+
+  /* ===== Galería "Mis creaciones" ===== */
+  #gallery-view { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg, #667eea, #764ba2); overflow-y: auto; }
+  .gal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
+  .gal-header h1 { color: #fff; font-size: 1.35rem; }
+  .btn-new { border: none; border-radius: 12px; padding: 10px 16px; font-weight: 700; font-size: .95rem; background: #fff; color: #764ba2; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .btn-new:active { transform: scale(.96); }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding: 14px 18px 28px; }
+  .gal-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.2); cursor: pointer; position: relative; }
+  .gal-card:active { transform: scale(.97); }
+  .gal-card .thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #eee; }
+  .gal-card .meta { padding: 8px 10px; }
+  .gal-card .bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .gal-card .bar > div { height: 100%; background: #d63384; }
+  .gal-card .pct { font-size: .72rem; color: #888; margin-top: 4px; display: flex; justify-content: space-between; }
+  .gal-card .done { color: #4CAF50; font-weight: 700; }
+  .gal-card .del { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: .9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .gal-empty { color: #fff; text-align: center; margin: auto; opacity: .9; line-height: 1.6; }
+  .gal-empty .big { font-size: 3rem; margin-bottom: 8px; }
   .card h1 { font-size: 1.4rem; color: #333; margin-bottom: 4px; }
   .card p.sub { color: #888; font-size: .85rem; margin-bottom: 20px; }
   .drop {
@@ -148,9 +168,23 @@
 </head>
 <body>
 
+  <!-- ===== Galería "Mis creaciones" (home) ===== -->
+  <div id="gallery-view">
+    <div class="gal-header">
+      <h1>🎨 Mis creaciones</h1>
+      <button class="btn-new" id="btn-new">+ Nueva</button>
+    </div>
+    <div id="gal-grid" class="gal-grid"></div>
+    <div id="gal-empty" class="gal-empty" hidden>
+      <div class="big">🖼️</div>
+      Aún no tienes creaciones.<br>Pulsa <b>+ Nueva</b> para convertir una foto.
+    </div>
+  </div>
+
   <!-- ===== Vista de subida ===== -->
   <div id="upload-view">
     <div class="card">
+      <button class="card-back" id="upload-back" aria-label="Volver">←</button>
       <h1>🎨 Tu foto → Color by Number</h1>
       <p class="sub">Sube una foto y genera un mandala numerado vectorial con zoom infinito.</p>
 
@@ -216,9 +250,10 @@
   <div id="victory">
     <h2>🎉 ¡Completado!</h2>
     <p>Tu foto es ahora una obra de arte.</p>
-    <button id="victory-close">Crear otra</button>
+    <button id="victory-close">Mis creaciones</button>
   </div>
 
+  <script src="js/creations.js"></script>
   <script src="js/svg-game.js"></script>
 </body>
 </html>

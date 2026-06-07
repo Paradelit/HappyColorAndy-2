@@ -50,9 +50,70 @@ const SvgGame = {
       progressBar: document.getElementById('progress-bar'),
       progressPct: document.getElementById('progress-pct'),
       victory: document.getElementById('victory'),
+      galleryView: document.getElementById('gallery-view'),
+      galGrid: document.getElementById('gal-grid'),
+      galEmpty: document.getElementById('gal-empty'),
+      btnNew: document.getElementById('btn-new'),
+      uploadBack: document.getElementById('upload-back'),
     };
     this.bindUpload();
     this.bindCanvas();
+    this.bindGallery();
+    this.showGallery();   // la home es "Mis creaciones"
+  },
+
+  // ---------- navegacion entre vistas ----------
+  bindGallery() {
+    this.ui.btnNew.onclick = () => this.showUpload();
+    this.ui.uploadBack.onclick = () => this.showGallery();
+  },
+
+  hideAllViews() {
+    this.ui.galleryView.style.display = 'none';
+    this.ui.uploadView.style.display = 'none';
+    this.ui.gameView.style.display = 'none';
+  },
+
+  showUpload() {
+    this.hideAllViews();
+    this.ui.uploadView.style.display = 'flex';
+  },
+
+  async showGallery() {
+    this.hideAllViews();
+    this.ui.galleryView.style.display = 'flex';
+    await this.renderGallery();
+  },
+
+  async renderGallery() {
+    let items = [];
+    try { items = await Creations.list(); } catch (e) { items = []; }
+    this.ui.galEmpty.hidden = items.length > 0;
+    this.ui.galGrid.innerHTML = '';
+    items.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'gal-card';
+      const done = c.progress >= 100;
+      card.innerHTML =
+        `<img class="thumb" src="${c.thumb || ''}" alt="">` +
+        `<button class="del" title="Borrar">✕</button>` +
+        `<div class="meta"><div class="bar"><div style="width:${c.progress || 0}%"></div></div>` +
+        `<div class="pct"><span>${done ? '<span class=\"done\">✓ Completo</span>' : (c.progress || 0) + '%'}</span></div></div>`;
+      card.querySelector('.thumb').onclick = () => this.resumeCreation(c.id);
+      card.querySelector('.meta').onclick = () => this.resumeCreation(c.id);
+      card.querySelector('.del').onclick = async (e) => {
+        e.stopPropagation();
+        if (confirm('¿Borrar esta creación?')) { await Creations.remove(c.id); this.renderGallery(); }
+      };
+      this.ui.galGrid.appendChild(card);
+    });
+  },
+
+  async resumeCreation(id) {
+    const c = await Creations.get(id);
+    if (!c) return;
+    this.creation = c;
+    this.loadDoc(c.doc, c.paintedIds || []);
   },
 
   // ---------- vista de subida ----------
@@ -140,7 +201,15 @@ const SvgGame = {
         throw new Error('HTTP ' + res.status + ' · ' + (detail || '').slice(0, 600));
       }
       const doc = await res.json();
-      this.loadDoc(doc);
+      // guardar como nueva creacion (miniatura de la foto original + el doc)
+      let thumb = '';
+      try { thumb = await makeThumb(f); } catch (_) { /* sin miniatura */ }
+      this.creation = {
+        id: Creations.newId(), createdAt: Date.now(), updatedAt: Date.now(),
+        thumb, doc, paintedIds: [], total: doc.regions.length, progress: 0,
+      };
+      try { await Creations.put(this.creation); } catch (_) { /* cuota */ }
+      this.loadDoc(doc, []);
     } catch (e) {
       // error de red (no respondio el server) vs error devuelto por el server
       const isNetwork = (e instanceof TypeError);
@@ -153,7 +222,7 @@ const SvgGame = {
   },
 
   // ---------- carga del documento y construccion del SVG ----------
-  loadDoc(doc) {
+  loadDoc(doc, paintedIds = []) {
     this.doc = doc;
     const n = doc.palette.length;
     this.colorRemaining = new Array(n).fill(0);
@@ -165,17 +234,17 @@ const SvgGame = {
     this.regionsByCluster = {};   // cluster id -> [region ids] (un clic pinta todo)
     this.clusterColor = {};       // cluster id -> numero
     this.targetEls = [];
+    this.paintedSet = new Set();
     this.state.paintedCount = 0;
     this.state.totalRegions = doc.regions.length;
-    this.sig = this.signature(doc);
 
     this.buildSvg();
     this.generarPaletaUI();
 
-    this.ui.uploadView.style.display = 'none';
+    this.hideAllViews();
     this.ui.gameView.style.display = 'flex';
     this.fitCamera(doc.width, doc.height);
-    this.resumeProgress();      // retoma lo ya pintado de una sesion anterior
+    this.resumePainted(paintedIds);   // retoma lo ya pintado de esta creacion
     // quita (sin animacion) los numeros ya completados al retomar
     this.colorRemaining.forEach((rem, i) => {
       if (this.colorTotal[i] > 0 && rem <= 0) {
@@ -297,6 +366,7 @@ const SvgGame = {
     const hex = r.fill || this.doc.palette[r.color].hex; // color real de la region
     pathEl.classList.remove('target');
     pathEl.classList.add('painted');
+    if (this.paintedSet) this.paintedSet.add(r.id);
     const lbl = this.labelEls[r.id];
     if (lbl) lbl.classList.add('hidden');     // el numero desaparece al pintar
 
@@ -496,28 +566,26 @@ const SvgGame = {
     this.highlightTargets(i);   // resalta donde hay que pintar
   },
 
-  // ---------- guardar / retomar progreso (localStorage) ----------
-  signature(doc) {
-    // firma barata pero suficiente para no confundir dos puzzles distintos
-    let h = doc.regions.length * 2654435761;
-    h ^= doc.width * 40503 + doc.height;
-    doc.palette.forEach(p => { for (const c of p.hex) h = (h * 31 + c.charCodeAt(0)) | 0; });
-    return 'svgpaint:' + (h >>> 0).toString(36) + ':' + doc.regions.length;
-  },
-
+  // ---------- guardar / retomar progreso (IndexedDB, por creacion) ----------
+  // Guardado con debounce: pintar muchas regiones no machaca IndexedDB.
   saveProgress() {
-    if (!this.sig) return;
-    const ids = [];
-    for (const id in this.pathEls) {
-      if (this.pathEls[id].classList.contains('painted')) ids.push(+id);
-    }
-    try { localStorage.setItem(this.sig, JSON.stringify(ids)); } catch (e) { /* cuota llena */ }
+    if (!this.creation) return;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this._persist(), 700);
   },
 
-  resumeProgress() {
-    let saved;
-    try { saved = JSON.parse(localStorage.getItem(this.sig) || '[]'); } catch (e) { saved = []; }
-    saved.forEach(id => {
+  async _persist() {
+    if (!this.creation) return;
+    const pct = this.state.totalRegions
+      ? Math.round((this.state.paintedCount / this.state.totalRegions) * 100) : 0;
+    this.creation.paintedIds = Array.from(this.paintedSet || []);
+    this.creation.progress = pct;
+    this.creation.updatedAt = Date.now();
+    try { await Creations.put(this.creation); } catch (e) { /* cuota llena */ }
+  },
+
+  resumePainted(ids) {
+    (ids || []).forEach(id => {
       const el = this.pathEls[id], r = this.regionsById[id];
       if (el && r) this.paint(r, el, { feedback: false });
     });
@@ -651,8 +719,8 @@ const SvgGame = {
     vp.addEventListener('touchend', e => this.handleTouchEnd(e));
 
     // botones
-    document.getElementById('back-btn').onclick = () => this.backToUpload();
-    document.getElementById('victory-close').onclick = () => { this.ui.victory.style.display = 'none'; this.backToUpload(); };
+    document.getElementById('back-btn').onclick = () => this.backToGallery();
+    document.getElementById('victory-close').onclick = () => { this.ui.victory.style.display = 'none'; this.backToGallery(); };
     // herramientas (zoom / pista / varita)
     const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
     bind('tool-zoom-in', () => this.zoomBy(1.4));
@@ -714,9 +782,10 @@ const SvgGame = {
     // hasMov se resetea en el proximo touchstart/mousedown (evita carrera con el click)
   },
 
-  backToUpload() {
-    this.ui.gameView.style.display = 'none';
-    this.ui.uploadView.style.display = 'flex';
+  async backToGallery() {
+    clearTimeout(this._saveTimer);
+    await this._persist();      // guarda el progreso antes de salir
+    this.showGallery();
   },
 };
 
