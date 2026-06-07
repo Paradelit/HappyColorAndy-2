@@ -56,11 +56,23 @@ const SvgGame = {
       btnNew: document.getElementById('btn-new'),
       uploadBack: document.getElementById('upload-back'),
     };
+    this.applyDefaultBackend();   // antes de bindUpload (que consulta capabilities)
     this.bindUpload();
     this.bindCanvas();
     this.bindGallery();
     this.bindFinale();
     this.showGallery();   // la home es "Mis creaciones"
+  },
+
+  // URL del backend: por defecto el mismo servidor que sirve la web (relativa).
+  // En desarrollo local con un servidor estatico aparte (Live Server :5500,
+  // file://...), apunta a uvicorn en :8000.
+  applyDefaultBackend() {
+    if (this.ui.backendUrl.value.trim()) return;     // respeta override del usuario
+    const loc = location;
+    const devStatic = loc.protocol === 'file:' ||
+      (/^(localhost|127\.0\.0\.1)$/.test(loc.hostname) && loc.port && loc.port !== '8000');
+    if (devStatic) this.ui.backendUrl.value = 'http://localhost:8000';
   },
 
   // ---------- navegacion entre vistas ----------

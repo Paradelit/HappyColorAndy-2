@@ -1,0 +1,19 @@
+# Blueprint de Render (https://render.com) — despliegue en 1 clic desde el repo.
+# En Render: New > Blueprint > elige este repo. Lee este fichero, construye el
+# Dockerfile y publica una URL HTTPS. Define STYLIZE_API_KEY en el panel (secreto).
+services:
+  - type: web
+    name: happycolor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # 'free' (512 MB) sirve para PROBAR (se duerme tras inactividad). Para uso
+    # real sube a 'standard' (2 GB): el procesado de imagen necesita memoria.
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: STYLIZE_API_KEY      # clave Gemini (Google AI Studio). Secreto.
+        sync: false               # se introduce en el panel, no en el repo
+      - key: STYLIZE_PROVIDER
+        value: gemini
+      - key: CORS_ORIGINS         # mismo origen -> no hace falta; "*" por si acaso
+        value: "*"

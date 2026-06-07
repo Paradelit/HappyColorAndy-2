@@ -12,12 +12,15 @@ Ejecutar local:
 """
 
 import io
+import os
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from pipeline.runner import generate_color_by_number
 from pipeline.preprocess import preprocess
@@ -27,11 +30,14 @@ from pipeline.stylize import stylize_available
 
 app = FastAPI(title="HappyColor Foto -> SVG", version="1.0")
 
-# PoC: se permite cualquier origen para que el frontend estatico
-# (p.ej. http://localhost:5500) pueda llamar al API en :8000.
+# CORS: en produccion el backend sirve tambien el frontend (mismo origen), pero
+# se deja configurable por si el frontend se hospeda aparte. CORS_ORIGINS =
+# lista separada por comas, o "*" (por defecto) para permitir cualquiera.
+_origins_env = os.environ.get("CORS_ORIGINS", "*").strip()
+_origins = ["*"] if _origins_env in ("", "*") else [o.strip() for o in _origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -126,3 +132,35 @@ async def preview(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Error en preview: {exc}")
     return Response(content=buf.getvalue(), media_type="image/png")
+
+
+# ----------------------------------------------------------------------------
+# Servir el frontend estatico (mismo origen que el API -> sin CORS).
+# FRONTEND_DIR apunta a la carpeta con upload.html + js/ (por defecto, la raiz
+# del repo, un nivel por encima de backend/). Se montan rutas concretas para no
+# tapar los endpoints del API.
+# ----------------------------------------------------------------------------
+FRONTEND_DIR = Path(os.environ.get("FRONTEND_DIR", Path(__file__).resolve().parent.parent))
+_INDEX = FRONTEND_DIR / "upload.html"
+
+
+@app.get("/")
+def index():
+    if _INDEX.exists():
+        return FileResponse(_INDEX)
+    return {"status": "ok", "note": "frontend no encontrado; usa el API en /generate"}
+
+
+# Sirve los modulos JS de la app.
+if (FRONTEND_DIR / "js").is_dir():
+    app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
+
+
+# Sirve, si existen, los ficheros sueltos de PWA (manifest, service worker, icono).
+@app.get("/{asset}")
+def root_asset(asset: str):
+    if asset in {"manifest.json", "service-worker.js", "icon.png", "favicon.ico"}:
+        f = FRONTEND_DIR / asset
+        if f.exists():
+            return FileResponse(f)
+    raise HTTPException(status_code=404, detail="No encontrado")

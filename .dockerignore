@@ -1,0 +1,26 @@
+# Mantiene el contexto de build pequeño: fuera git, caches, la app antigua y la
+# media pesada (no la usa el MVP nuevo: upload.html + js/{svg-game,creations,finale}).
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+
+# media pesada (musica, imagenes de referencia, icono enorme)
+*.mp3
+*.png
+
+# app antigua (index.html + sus modulos) — el MVP nuevo no la necesita
+index.html
+js/game.js
+js/data.js
+js/gallery.js
+js/gallery_backup.js
+js/audio.js
+js/keys.js
+js/sync.js
+js/tutorial.js
+js/worker.js
+js/db.js
+
+# docs
+*.md
