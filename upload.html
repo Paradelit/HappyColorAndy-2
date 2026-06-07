@@ -161,9 +161,17 @@
   .backend label { font-size: .7rem; color: #999; }
   .backend input { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: .8rem; }
 
-  #victory { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; z-index: 60; }
-  #victory h2 { font-size: 2rem; margin-bottom: 10px; }
-  #victory button { margin-top: 18px; border: none; border-radius: 12px; padding: 12px 24px; font-weight: 700; background: #d63384; color: #fff; cursor: pointer; }
+  #victory { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; z-index: 60; padding: 18px; }
+  .finale-card { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; }
+  #finale-title { font-size: 1.7rem; margin-bottom: 14px; text-align: center; }
+  .finale-stage { width: 100%; display: flex; justify-content: center; }
+  #finale-canvas { width: 100%; max-width: 360px; height: auto; border-radius: 14px; background: #fff; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+  .finale-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-top: 18px; }
+  .finale-actions button { border: none; border-radius: 12px; padding: 12px 10px; font-weight: 700; font-size: .95rem; background: #fff; color: #333; cursor: pointer; }
+  .finale-actions button:active { transform: scale(.96); }
+  .finale-actions button:disabled { opacity: .55; }
+  #fin-share { background: #d63384; color: #fff; }
+  #victory button.ghost { margin-top: 14px; background: transparent; color: #bbb; border: none; font-weight: 600; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -238,6 +246,7 @@
         <button id="tool-zoom-in" title="Acercar">+</button>
         <button id="tool-zoom-out" title="Alejar">−</button>
         <button id="tool-fit" title="Ajustar a pantalla">⊡</button>
+        <button id="tool-finale" title="Ver timelapse / compartir">🎬</button>
       </div>
     </div>
     <div class="paleta-container">
@@ -248,12 +257,21 @@
   <div id="loading-overlay"><div class="spinner"></div><p id="loading-text">Generando tu obra…</p></div>
 
   <div id="victory">
-    <h2>🎉 ¡Completado!</h2>
-    <p>Tu foto es ahora una obra de arte.</p>
-    <button id="victory-close">Mis creaciones</button>
+    <div class="finale-card">
+      <h2 id="finale-title">🎉 ¡Completado!</h2>
+      <div class="finale-stage"><canvas id="finale-canvas"></canvas></div>
+      <div class="finale-actions">
+        <button id="fin-replay">🔁 Repetir</button>
+        <button id="fin-download">⬇️ Imagen</button>
+        <button id="fin-video">🎬 Vídeo</button>
+        <button id="fin-share">🔗 Compartir</button>
+      </div>
+      <button id="victory-close" class="ghost">Mis creaciones</button>
+    </div>
   </div>
 
   <script src="js/creations.js"></script>
+  <script src="js/finale.js"></script>
   <script src="js/svg-game.js"></script>
 </body>
 </html>

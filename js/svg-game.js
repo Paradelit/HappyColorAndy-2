@@ -59,6 +59,7 @@ const SvgGame = {
     this.bindUpload();
     this.bindCanvas();
     this.bindGallery();
+    this.bindFinale();
     this.showGallery();   // la home es "Mis creaciones"
   },
 
@@ -665,7 +666,65 @@ const SvgGame = {
     if (typeof confetti === 'function') {
       confetti({ particleCount: 120, spread: 80, origin: { y: .6 }, colors: ['#d63384', '#667eea', '#764ba2', '#f093fb', '#4facfe'] });
     }
-    setTimeout(() => { this.ui.victory.style.display = 'flex'; }, 900);
+    this.refreshThumb();   // miniatura final para la galeria
+    setTimeout(() => this.openFinale(true), 900);
+  },
+
+  // ---------- pantalla final: timelapse + descargar + compartir ----------
+  // Regiones en orden de pintado, como [{d, hex}] para el motor Finale.
+  buildOrder() {
+    const out = [];
+    (this.paintedSet ? Array.from(this.paintedSet) : []).forEach(id => {
+      const r = this.regionsById[id];
+      if (r) out.push({ d: r.d, hex: r.fill || this.doc.palette[r.color].hex });
+    });
+    return out;
+  },
+
+  openFinale(completed) {
+    this._order = this.buildOrder();
+    if (!this._order.length) return;   // nada que mostrar
+    document.getElementById('finale-title').textContent =
+      completed ? '🎉 ¡Completado!' : '🎬 Tu progreso';
+    this.ui.victory.style.display = 'flex';
+    this.playFinale();
+  },
+
+  playFinale() {
+    const gen = (this._playGen = (this._playGen || 0) + 1);
+    const canvas = document.getElementById('finale-canvas');
+    Finale.play(canvas, this.doc, this._order || [], { cancelled: () => gen !== this._playGen });
+  },
+
+  async withBusy(btn, label, fn) {
+    const prev = btn.textContent;
+    btn.disabled = true; btn.textContent = label;
+    try { await fn(); } finally { btn.disabled = false; btn.textContent = prev; }
+  },
+
+  bindFinale() {
+    const order = () => this._order || [];
+    document.getElementById('fin-replay').onclick = () => this.playFinale();
+
+    document.getElementById('fin-download').onclick = (e) =>
+      this.withBusy(e.currentTarget, '…', async () => {
+        const png = await Finale.toPng(this.doc, order());
+        downloadBlob(png, 'mi-obra.png');
+      });
+
+    document.getElementById('fin-video').onclick = (e) =>
+      this.withBusy(e.currentTarget, 'Grabando…', async () => {
+        const vid = await Finale.toVideo(this.doc, order());
+        if (vid) downloadBlob(vid, 'mi-timelapse.webm');
+        else alert('Tu navegador no permite exportar vídeo.');
+      });
+
+    document.getElementById('fin-share').onclick = (e) =>
+      this.withBusy(e.currentTarget, 'Preparando…', async () => {
+        const png = await Finale.toPng(this.doc, order(), 1080);
+        const ok = await shareFile(png, 'mi-obra.png', '¡Mira mi obra! 🎨');
+        if (!ok) downloadBlob(png, 'mi-obra.png');   // fallback: descarga
+      });
   },
 
   // ---------- camara: pan / zoom (portado de game.js) ----------
@@ -728,6 +787,7 @@ const SvgGame = {
     bind('tool-fit', () => this.fit());
     bind('tool-hint', () => this.hint());
     bind('tool-wand', () => this.magicWand());
+    bind('tool-finale', () => this.openFinale(this.state.paintedCount === this.state.totalRegions));
   },
 
   handleWheel(e) {
@@ -783,6 +843,7 @@ const SvgGame = {
   },
 
   async backToGallery() {
+    this._playGen = (this._playGen || 0) + 1;  // detiene cualquier timelapse en curso
     clearTimeout(this._saveTimer);
     await this.refreshThumb();  // miniatura = estado pintado actual
     await this._persist();      // guarda el progreso antes de salir
