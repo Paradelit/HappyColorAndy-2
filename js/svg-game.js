@@ -99,6 +99,7 @@ const SvgGame = {
       const res = await fetch(base + '/capabilities');
       const cap = await res.json();
       this.ui.aiToggle.hidden = !cap.stylize;
+      if (cap.stylize) this.ui.stylize.checked = true;  // IA por defecto si esta disponible
     } catch (e) {
       this.ui.aiToggle.hidden = true;  // backend no disponible aun
     }
