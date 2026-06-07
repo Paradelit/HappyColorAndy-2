@@ -33,17 +33,20 @@ def generate_color_by_number(
         file_bytes = ai_stylize(file_bytes)   # foto -> ilustracion (IA)
         stylized = True
 
-    rgb = preprocess(file_bytes, process_size=process_size)
+    # En modo IA la entrada ya es una ilustracion limpia: NO se suaviza (para no
+    # emborronar las lineas nitidas) y se procesa a mayor resolucion.
+    eff_process_size = 1500 if stylized else process_size
+    rgb = preprocess(file_bytes, process_size=eff_process_size, denoise=not stylized)
     h, w = rgb.shape[:2]
 
-    # La entrada estilizada ya es una ilustracion plana y limpia: conviene un
-    # perfil con menos colores y regiones MAS GRANDES (no sub-dividir el dibujo).
-    # Sin estilizar (foto), se busca mas detalle.
+    # Perfil de DETALLE para la ilustracion (lineas finas, hojas, mechones...):
+    # muchos colores y regiones finas. Como la IA ya es limpia, el detalle alto
+    # se ve nitido (no "mosaico"). Sin IA (foto) se usa el perfil normal.
     if stylized:
-        fine_colors = int(min(72, max(n_colors * 2, 48)))
-        eff_min_area = max(min_area_pct, 0.10)
-        eff_max_regions = min(max_regions, 1500)
-        eff_clean = max(clean_radius, 2)
+        fine_colors = 120
+        eff_min_area = min(min_area_pct, 0.015)
+        eff_max_regions = max(max_regions, 5000)
+        eff_clean = 1
     else:
         fine_colors = int(min(120, max(n_colors * 3, 96)))
         eff_min_area = min_area_pct

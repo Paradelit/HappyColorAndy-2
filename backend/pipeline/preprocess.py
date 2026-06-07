@@ -45,9 +45,14 @@ def smooth(rgb: np.ndarray, size: int = 3) -> np.ndarray:
     return median_filter(rgb, size=(size, size, 1))
 
 
-def preprocess(file_bytes: bytes, process_size: int = 1200) -> np.ndarray:
-    """Devuelve la imagen RGB lista para cuantizar."""
+def preprocess(file_bytes: bytes, process_size: int = 1200, denoise: bool = True) -> np.ndarray:
+    """Devuelve la imagen RGB lista para cuantizar.
+
+    `denoise=False` salta el suavizado: util cuando la entrada ya es una
+    ilustracion limpia (modo IA), para no emborronar sus lineas nitidas.
+    """
     rgb = load_rgb(file_bytes)
     rgb = resize_longest(rgb, process_size)
-    rgb = smooth(rgb)
+    if denoise:
+        rgb = smooth(rgb)
     return rgb
