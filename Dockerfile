@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ ./backend/
 COPY upload.html ./upload.html
 COPY js/ ./js/
+# Ficheros PWA (instalable + offline)
+COPY manifest.json sw.js icon-192.png icon-512.png ./
 
 # El backend encuentra el frontend en /app (upload.html + js/).
 ENV FRONTEND_DIR=/app

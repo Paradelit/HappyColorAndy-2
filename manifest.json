@@ -1,20 +1,16 @@
 {
-  "name": "Andy's Happy Color:Color by Numbers",
-  "short_name": "Andy's Happy Color",
-  "start_url": "./index.html",
+  "name": "Andy Color — Foto a Color by Number",
+  "short_name": "Andy Color",
+  "description": "Convierte tus fotos en dibujos para pintar por números.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f0f4f8",
-  "theme_color": "#ffffff",
+  "orientation": "portrait",
+  "background_color": "#764ba2",
+  "theme_color": "#764ba2",
   "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

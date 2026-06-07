@@ -2,8 +2,19 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Andy Color · Tu foto → Color by Number</title>
+
+<!-- PWA -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#764ba2">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Andy Color">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" href="/icon-192.png">
+
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -25,8 +36,11 @@
   #gallery-view { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg, #667eea, #764ba2); overflow-y: auto; }
   .gal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
   .gal-header h1 { color: #fff; font-size: 1.35rem; }
+  .gal-actions { display: flex; gap: 8px; align-items: center; }
   .btn-new { border: none; border-radius: 12px; padding: 10px 16px; font-weight: 700; font-size: .95rem; background: #fff; color: #764ba2; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
   .btn-new:active { transform: scale(.96); }
+  .btn-install { border: 1.5px solid rgba(255,255,255,.7); border-radius: 12px; padding: 9px 12px; font-weight: 700; font-size: .85rem; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; }
+  .btn-install:active { transform: scale(.96); }
   .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding: 14px 18px 28px; }
   .gal-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.2); cursor: pointer; position: relative; }
   .gal-card:active { transform: scale(.97); }
@@ -180,7 +194,10 @@
   <div id="gallery-view">
     <div class="gal-header">
       <h1>🎨 Mis creaciones</h1>
-      <button class="btn-new" id="btn-new">+ Nueva</button>
+      <div class="gal-actions">
+        <button class="btn-install" id="btn-install" hidden>⬇️ Instalar</button>
+        <button class="btn-new" id="btn-new">+ Nueva</button>
+      </div>
     </div>
     <div id="gal-grid" class="gal-grid"></div>
     <div id="gal-empty" class="gal-empty" hidden>
@@ -269,6 +286,28 @@
       <button id="victory-close" class="ghost">Mis creaciones</button>
     </div>
   </div>
+
+  <!-- PWA: registro del service worker + botón de instalación -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('btn-install');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBtn) installBtn.hidden = false;
+    });
+    if (installBtn) installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.hidden = true;
+    });
+    window.addEventListener('appinstalled', () => { if (installBtn) installBtn.hidden = true; });
+  </script>
 
   <script src="js/creations.js"></script>
   <script src="js/finale.js"></script>

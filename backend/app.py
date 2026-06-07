@@ -156,10 +156,13 @@ if (FRONTEND_DIR / "js").is_dir():
     app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
 
 
-# Sirve, si existen, los ficheros sueltos de PWA (manifest, service worker, icono).
+# Sirve, si existen, los ficheros sueltos de PWA (manifest, service worker, iconos).
+_ROOT_ASSETS = {"manifest.json", "sw.js", "icon-192.png", "icon-512.png", "favicon.ico"}
+
+
 @app.get("/{asset}")
 def root_asset(asset: str):
-    if asset in {"manifest.json", "service-worker.js", "icon.png", "favicon.ico"}:
+    if asset in _ROOT_ASSETS:
         f = FRONTEND_DIR / asset
         if f.exists():
             return FileResponse(f)

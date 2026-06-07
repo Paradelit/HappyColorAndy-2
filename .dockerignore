@@ -8,6 +8,9 @@
 # media pesada (musica, imagenes de referencia, icono enorme)
 *.mp3
 *.png
+# ...pero SI los iconos PWA (pequenos)
+!icon-192.png
+!icon-512.png
 
 # app antigua (index.html + sus modulos) — el MVP nuevo no la necesita
 index.html
