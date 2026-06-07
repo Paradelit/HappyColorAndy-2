@@ -36,11 +36,23 @@ def generate_color_by_number(
     rgb = preprocess(file_bytes, process_size=process_size)
     h, w = rgb.shape[:2]
 
-    # Cuantizacion FINA para formar regiones detalladas (no es la paleta final).
-    fine_colors = int(min(120, max(n_colors * 3, 96)))
-    label_image, fine_palette = quantize(rgb, n_colors=fine_colors, clean_radius=clean_radius)
+    # La entrada estilizada ya es una ilustracion plana y limpia: conviene un
+    # perfil con menos colores y regiones MAS GRANDES (no sub-dividir el dibujo).
+    # Sin estilizar (foto), se busca mas detalle.
+    if stylized:
+        fine_colors = int(min(72, max(n_colors * 2, 48)))
+        eff_min_area = max(min_area_pct, 0.10)
+        eff_max_regions = min(max_regions, 1500)
+        eff_clean = max(clean_radius, 2)
+    else:
+        fine_colors = int(min(120, max(n_colors * 3, 96)))
+        eff_min_area = min_area_pct
+        eff_max_regions = max_regions
+        eff_clean = clean_radius
+
+    label_image, fine_palette = quantize(rgb, n_colors=fine_colors, clean_radius=eff_clean)
     region_map, _fine_color, region_area = segment(
-        label_image, fine_palette, min_area_pct=min_area_pct, max_regions=max_regions
+        label_image, fine_palette, min_area_pct=eff_min_area, max_regions=eff_max_regions
     )
     n_regions = len(region_area)
 

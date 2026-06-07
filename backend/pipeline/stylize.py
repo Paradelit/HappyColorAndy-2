@@ -23,14 +23,15 @@ import os
 
 from PIL import Image
 
-# Prompt afinable: pide ilustracion plana y limpia conservando la composicion.
+# Prompt afinable: pide ilustracion plana, limpia y SIMPLE (pocas formas grandes).
 PROMPT = (
-    "Redraw this image as a clean color-by-number style illustration. "
-    "Use bold, smooth black outlines and large flat areas of solid color. "
-    "Strongly simplify shapes and remove ALL photographic texture, noise and grain "
-    "(fur, bark, foliage become simple flat shapes). "
-    "Coloring-book / cartoon illustration look, like the Happy Color app. "
-    "Keep the same composition, subject, pose and overall colors as the original."
+    "Redraw this photo as a clean, simple color-by-number illustration in the style "
+    "of the Happy Color app. Use bold black outlines and LARGE flat areas of solid "
+    "color with a limited palette (about 20-30 colors). Strongly simplify everything: "
+    "remove all photographic texture, noise and grain; turn fur, bark and foliage into "
+    "a few large simple flat shapes instead of many tiny details. Clean vector-like "
+    "cartoon look. Keep the same composition, subject, pose and overall colors as the "
+    "original photo."
 )
 
 # Cadena de modelos Gemini (el mejor primero; si uno falla/sin cuota, pasa al
