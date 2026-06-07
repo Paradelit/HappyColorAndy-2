@@ -8,7 +8,7 @@ import numpy as np
 from .preprocess import preprocess
 from .quantize import quantize
 from .segment import segment
-from .lineart import regions_from_lines, line_overlay_datauri
+from .lineart import build_lineart, line_overlay_datauri
 from .recolor import fills_and_groups, boundary_edge_strength, paint_clusters
 from .vectorize import vectorize
 from .labels import labels_for_regions
@@ -45,16 +45,16 @@ def generate_color_by_number(
 
     line_overlay = None
     if stylized:
-        # DOS CAPAS (como Happy Color):
+        # DOS NIVELES (como Happy Color):
         #  - capa de DIBUJO (overlay): todas las lineas finas -> se distingue todo.
-        #  - areas PINTABLES: piezas mas grandes delineadas por las lineas fuertes.
-        # Ajustables sin tocar codigo: LINEART_EDGE_THRESH / LINEART_MIN_AREA / LINEART_DARK.
-        edge_thresh = float(os.environ.get("LINEART_EDGE_THRESH", "0.08"))
-        la_min_area = float(os.environ.get("LINEART_MIN_AREA", "0.04"))
+        #  - PIEZAS pintables (un clic = un numero) con SUB-TONOS fieles dentro.
+        # Ajustables sin tocar codigo con LINEART_*.
+        piece_edge = float(os.environ.get("LINEART_PIECE_EDGE", "0.10"))
+        piece_area = float(os.environ.get("LINEART_PIECE_AREA", "0.02"))
         dark_thresh = float(os.environ.get("LINEART_DARK", "0.32"))
         line_overlay = line_overlay_datauri(rgb, dark_thresh=dark_thresh)
-        region_map, n_regions = regions_from_lines(
-            rgb, min_area_pct=la_min_area, edge_thresh=edge_thresh
+        region_map, n_regions, fills, groups, clusters, palette = build_lineart(
+            rgb, n_numbers=n_colors, min_piece_area_pct=piece_area, piece_edge_thresh=piece_edge
         )
     else:
         # Perfil foto: regiones por color (cuantizacion fina + fusion).
@@ -64,13 +64,12 @@ def generate_color_by_number(
             label_image, fine_palette, min_area_pct=min_area_pct, max_regions=max_regions
         )
         n_regions = len(_area)
+        # Color fiel por region + agrupacion en numeros + clusters por color contiguo.
+        fills, groups, palette = fills_and_groups(region_map, n_regions, rgb, n_groups=n_colors)
+        clusters = paint_clusters(region_map, n_regions, groups)
 
     region_area = np.bincount(region_map.ravel(), minlength=n_regions).astype(int).tolist()
-
-    # Color fiel por region + agrupacion en numeros + fuerza de borde (profundidad).
-    fills, groups, palette = fills_and_groups(region_map, n_regions, rgb, n_groups=n_colors)
     edge = boundary_edge_strength(region_map, n_regions, rgb)
-    clusters = paint_clusters(region_map, n_regions, groups)  # un clic = todo el grupo contiguo
 
     paths = vectorize(region_map, n_regions, simplify_tol=simplify_tol)
     labels = labels_for_regions(region_map, n_regions)
