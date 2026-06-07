@@ -39,6 +39,7 @@ const SvgGame = {
       backendUrl: document.getElementById('backend-url'),
       aiToggle: document.getElementById('ai-toggle'),
       stylize: document.getElementById('stylize'),
+      modeToggle: document.getElementById('mode-toggle'),
       loading: document.getElementById('loading-overlay'),
       loadingText: document.getElementById('loading-text'),
       viewport: document.getElementById('viewport'),
@@ -70,9 +71,26 @@ const SvgGame = {
 
     u.generate.onclick = () => this.generate();
 
+    // modo multitono / colores planos
+    this.multitone = true;
+    document.querySelectorAll('.mode').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('.mode').forEach(x => x.classList.remove('selected'));
+        b.classList.add('selected');
+        this.multitone = (b.dataset.mode === 'multi');
+      };
+    });
+    // el selector de modo solo tiene sentido en modo IA
+    u.stylize.addEventListener('change', () => this.updateModeVisibility());
+
     // muestra el modo IA solo si el backend tiene la clave configurada
     this.checkCapabilities();
     u.backendUrl.addEventListener('change', () => this.checkCapabilities());
+  },
+
+  updateModeVisibility() {
+    const on = !this.ui.aiToggle.hidden && this.ui.stylize.checked;
+    this.ui.modeToggle.hidden = !on;
   },
 
   async checkCapabilities() {
@@ -84,6 +102,7 @@ const SvgGame = {
     } catch (e) {
       this.ui.aiToggle.hidden = true;  // backend no disponible aun
     }
+    this.updateModeVisibility();
   },
 
   onFilePicked() {
@@ -104,7 +123,10 @@ const SvgGame = {
     const useAi = this.ui.stylize && this.ui.stylize.checked && !this.ui.aiToggle.hidden;
     const fd = new FormData();
     fd.append('file', f);
-    if (useAi) fd.append('stylize', 'true');
+    if (useAi) {
+      fd.append('stylize', 'true');
+      fd.append('multitone', this.multitone ? 'true' : 'false');
+    }
 
     this.ui.err.textContent = '';
     this.ui.loadingText.textContent = useAi ? 'Creando ilustración con IA…' : 'Generando tu obra…';
@@ -223,18 +245,16 @@ const SvgGame = {
 
     svg.appendChild(paths);
 
-    // Capa de DIBUJO (overlay de lineas): se ve siempre, encima del color y debajo
-    // de los numeros. Hace que se distinga todo el detalle antes y despues de pintar.
-    if (this.doc.lineOverlay) {
+    // Capa de DIBUJO (overlay de lineas VECTORIAL): nitido a cualquier zoom. Se ve
+    // siempre, encima del color y debajo de los numeros. Hace que se distinga todo.
+    if (this.doc.lineOverlayPath) {
       svg.classList.add('has-overlay');
-      const img = document.createElementNS(SVGNS, 'image');
-      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', this.doc.lineOverlay);
-      img.setAttribute('href', this.doc.lineOverlay);
-      img.setAttribute('x', 0); img.setAttribute('y', 0);
-      img.setAttribute('width', width); img.setAttribute('height', height);
-      img.setAttribute('pointer-events', 'none');
-      img.style.imageRendering = 'auto';
-      svg.appendChild(img);
+      const ov = document.createElementNS(SVGNS, 'path');
+      ov.setAttribute('d', this.doc.lineOverlayPath);
+      ov.setAttribute('fill', '#191919');
+      ov.setAttribute('fill-rule', 'evenodd');
+      ov.setAttribute('pointer-events', 'none');
+      svg.appendChild(ov);
     } else {
       svg.classList.remove('has-overlay');
     }

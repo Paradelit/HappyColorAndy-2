@@ -22,10 +22,23 @@ from PIL import Image
 from scipy.ndimage import binary_closing, binary_opening, distance_transform_edt
 from skimage.color import lab2rgb, rgb2gray, rgb2lab
 from skimage.filters import sobel
-from skimage.measure import label as cc_label
+from skimage.measure import find_contours, label as cc_label
 from sklearn.cluster import KMeans
+from shapely.geometry import LinearRing
 
 from .quantize import quantize
+
+
+def auto_dark_thresh(rgb) -> float:
+    """Umbral de tinta automatico: la tinta son los pixeles mas oscuros."""
+    gray = rgb2gray(rgb.astype(np.float64) / 255.0)
+    return float(np.clip(np.percentile(gray, 7) + 0.05, 0.18, 0.42))
+
+
+def auto_edge_thresh(rgb) -> float:
+    """Umbral de borde automatico: percentil alto de la magnitud del gradiente."""
+    g = sobel(rgb2gray(rgb.astype(np.float64) / 255.0))
+    return float(np.clip(np.percentile(g, 90), 0.05, 0.22))
 
 
 def _ink_lines(rgb, dark_thresh: float = 0.32, line_width: int = 3) -> np.ndarray:
@@ -47,19 +60,28 @@ def ink_walls(rgb, dark_thresh: float = 0.32, line_width: int = 3, close: int = 
     return binary_closing(lines, structure=np.ones((close, close), dtype=bool))
 
 
-def line_overlay_datauri(rgb, dark_thresh: float = 0.32, line_width: int = 3) -> str:
-    """Capa de DIBUJO: las lineas de tinta en PNG transparente (data URI).
-
-    Es la "capa de tinta" que se ve siempre (antes y despues de pintar): hace que
-    se distinga todo el detalle (mechones, hojas...) aunque las piezas sean grandes.
-    """
+def line_overlay_path(rgb, dark_thresh: float = 0.32, line_width: int = 3, simplify_tol: float = 0.9) -> str:
+    """Capa de DIBUJO en VECTOR: las lineas de tinta como un path SVG (nitido a
+    cualquier zoom). Traza el contorno de las lineas y las rellena (fill-rule
+    evenodd). Sustituye al overlay raster para no perder calidad."""
     lines = _ink_lines(rgb, dark_thresh, line_width)
-    h, w = lines.shape
-    rgba = np.zeros((h, w, 4), dtype=np.uint8)
-    rgba[lines] = (25, 25, 25, 255)  # tinta casi negra
-    buf = io.BytesIO()
-    Image.fromarray(rgba, "RGBA").save(buf, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+    padded = np.pad(lines.astype(np.uint8), 1, mode="constant", constant_values=0)
+    contours = find_contours(padded, level=0.5)
+    subs = []
+    for c in contours:
+        pts = [(float(col) - 1.0, float(row) - 1.0) for row, col in c]
+        if len(pts) < 4:
+            continue
+        try:
+            ring = LinearRing(pts).simplify(simplify_tol, preserve_topology=False)
+        except Exception:
+            continue
+        coords = list(ring.coords)
+        if len(coords) < 4:
+            continue
+        d = "M " + " L ".join(f"{round(x, 1)} {round(y, 1)}" for x, y in coords[:-1]) + " Z"
+        subs.append(d)
+    return " ".join(subs)
 
 
 def detect_walls(rgb, edge_thresh: float = 0.10) -> np.ndarray:
@@ -203,48 +225,55 @@ def piece_walls(rgb, dark_thresh=0.32, piece_edge_thresh=0.12):
     return binary_closing(walls, structure=np.ones((3, 3), dtype=bool))
 
 
-def build_lineart(rgb, n_numbers=36, min_piece_area_pct=0.02, piece_edge_thresh=0.10,
-                  fine_colors=48, multitone_spread=6.0):
+def build_lineart(rgb, n_numbers=75, min_piece_area_pct=0.02, piece_edge_thresh=None,
+                  dark_thresh=None, fine_colors=64, multitone=True, multitone_spread=6.0):
     """Modelo de DOS NIVELES estilo Happy Color para una ilustracion.
 
     - PIEZA: area delimitada por lineas = unidad de pintado (un clic, un numero).
-    - SUB-REGION: dentro de una pieza, cada tono fiel distinto (se rellenan todos
-      al pintar la pieza). Asi un numero "verde" pinta su area con los verdes que
-      haga falta para ser fiel al original.
+    - SUB-REGION (solo modo multitono): dentro de una pieza, cada tono fiel distinto
+      (se rellenan todos al pintar la pieza). En modo PLANO, cada pieza es un unico
+      color (su media).
+
+    `piece_edge_thresh` / `dark_thresh` = None -> se calculan automaticamente segun
+    la imagen.
 
     Returns: region_map, n_regions, fills, numbers, clusters, palette
-      - fills[i]    hex fiel de la sub-region i
-      - numbers[i]  numero (grupo) de la PIEZA de la sub-region i
-      - clusters[i] id de PIEZA (un clic pinta toda la pieza)
-      - palette     [{index, hex, multitone, swatches}]
     """
     h, w = rgb.shape[:2]
+    if dark_thresh is None:
+        dark_thresh = auto_dark_thresh(rgb)
+    if piece_edge_thresh is None:
+        piece_edge_thresh = auto_edge_thresh(rgb)
+
     # Muros = lineas de tinta + bordes fuertes; el sombreado suave no parte la pieza.
-    walls = piece_walls(rgb, dark_thresh=0.32, piece_edge_thresh=piece_edge_thresh)
+    walls = piece_walls(rgb, dark_thresh=dark_thresh, piece_edge_thresh=piece_edge_thresh)
 
     # 1) Piezas (clics) delimitadas por lineas.
     piece_map, n_pieces = _regions_from_walls(walls, rgb, min_piece_area_pct)
 
-    # 2) Cuantizacion fina de color (base de los tonos fieles).
-    fine, _pal = quantize(rgb, n_colors=fine_colors, clean_radius=1)
+    if multitone:
+        # 2-3) Sub-regiones = areas de (misma pieza + mismo color) sin cruzar lineas.
+        fine, _pal = quantize(rgb, n_colors=fine_colors, clean_radius=1)
+        combined = piece_map.astype(np.int64) * (int(fine.max()) + 2) + fine.astype(np.int64)
+        combined[walls] = -1
+        sub = cc_label(combined, background=-1, connectivity=1)
+        if (sub == 0).any() and (sub > 0).any():
+            idx = distance_transform_edt(sub == 0, return_distances=False, return_indices=True)
+            sub = sub[tuple(idx)]
+        uniq = np.unique(sub)
+        remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
+        remap[uniq] = np.arange(len(uniq))
+        region_map = remap[sub].astype(np.int32)
+        region_map, n = _merge_small(region_map, len(uniq), rgb, min_area_pct=0.008)
+        flat_r = region_map.ravel()
+        _, first_idx = np.unique(flat_r, return_index=True)
+        region_piece = piece_map.ravel()[first_idx].astype(np.int64)
+    else:
+        # Modo PLANO: cada pieza = una region de un solo color (su media).
+        region_map, n = piece_map, n_pieces
+        region_piece = np.arange(n, dtype=np.int64)
+        flat_r = region_map.ravel()
 
-    # 3) Sub-regiones = areas de (misma pieza + mismo color) sin cruzar lineas.
-    combined = piece_map.astype(np.int64) * (int(fine.max()) + 2) + fine.astype(np.int64)
-    combined[walls] = -1
-    sub = cc_label(combined, background=-1, connectivity=1)
-    if (sub == 0).any() and (sub > 0).any():
-        idx = distance_transform_edt(sub == 0, return_distances=False, return_indices=True)
-        sub = sub[tuple(idx)]
-    uniq = np.unique(sub)
-    remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
-    remap[uniq] = np.arange(len(uniq))
-    region_map = remap[sub].astype(np.int32)
-    region_map, n = _merge_small(region_map, len(uniq), rgb, min_area_pct=0.008)
-
-    # 4) Pieza y color fiel de cada sub-region.
-    flat_r = region_map.ravel()
-    _, first_idx = np.unique(flat_r, return_index=True)
-    region_piece = piece_map.ravel()[first_idx].astype(np.int64)  # pieza por sub-region
     means = _region_means_u8(region_map, n, rgb)
     fills = [_hex(*means[i]) for i in range(n)]
 
@@ -287,7 +316,7 @@ def build_lineart(rgb, n_numbers=36, min_piece_area_pct=0.02, piece_edge_thresh=
             swatches = [_hex(*cols[0])] if len(cols) else [_hex(*centers[g])]
         palette.append({
             "index": g, "hex": _hex(*centers[g]),
-            "multitone": bool(spread > multitone_spread), "swatches": swatches,
+            "multitone": bool(multitone and spread > multitone_spread), "swatches": swatches,
         })
 
     return region_map, n, fills, numbers, clusters, palette

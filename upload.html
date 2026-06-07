@@ -54,6 +54,11 @@
   .ai-toggle input { width: 20px; height: 20px; accent-color: #764ba2; flex: 0 0 auto; }
   .ai-toggle span { display: flex; flex-direction: column; font-size: .85rem; color: #553; }
   .ai-toggle small { color: #998; font-size: .72rem; margin-top: 2px; }
+  .mode-toggle { display: flex; gap: 8px; margin: -4px 0 14px; }
+  .mode { flex: 1; border: 2px solid #e2e2ea; background: #fff; border-radius: 10px; padding: 8px 4px; font-size: .82rem; font-weight: 700; color: #777; cursor: pointer; }
+  .mode small { display: block; font-weight: 400; font-size: .64rem; color: #aaa; margin-top: 2px; }
+  .mode.selected { border-color: #764ba2; background: #f4f1ff; color: #764ba2; }
+  .mode.selected small { color: #9b86c9; }
 
   .btn {
     width: 100%; border: none; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 700;
@@ -161,6 +166,11 @@
         <input type="checkbox" id="stylize">
         <span><b>✨ Convertir en ilustración (IA)</b><small>foto → dibujo limpio estilo Happy Color · tarda unos segundos más</small></span>
       </label>
+
+      <div class="mode-toggle" id="mode-toggle" hidden>
+        <button type="button" class="mode selected" data-mode="multi">Multitono<small>varios tonos por zona</small></button>
+        <button type="button" class="mode" data-mode="flat">Colores planos<small>un color por zona</small></button>
+      </div>
 
       <button class="btn" id="generate" disabled>Generar</button>
       <div class="err" id="err"></div>

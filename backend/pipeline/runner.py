@@ -8,7 +8,7 @@ import numpy as np
 from .preprocess import preprocess
 from .quantize import quantize
 from .segment import segment
-from .lineart import build_lineart, line_overlay_datauri
+from .lineart import build_lineart, line_overlay_path, auto_dark_thresh
 from .recolor import fills_and_groups, boundary_edge_strength, paint_clusters
 from .vectorize import vectorize
 from .labels import labels_for_regions
@@ -25,6 +25,8 @@ def generate_color_by_number(
     max_regions: int = 5000,
     clean_radius: int = 1,
     stylize: bool = False,
+    multitone: bool = True,
+    ai_numbers: int = 75,
 ):
     """Ejecuta el pipeline y devuelve el dict JSON listo para el frontend.
 
@@ -46,15 +48,18 @@ def generate_color_by_number(
     line_overlay = None
     if stylized:
         # DOS NIVELES (como Happy Color):
-        #  - capa de DIBUJO (overlay): todas las lineas finas -> se distingue todo.
-        #  - PIEZAS pintables (un clic = un numero) con SUB-TONOS fieles dentro.
-        # Ajustables sin tocar codigo con LINEART_*.
-        piece_edge = float(os.environ.get("LINEART_PIECE_EDGE", "0.10"))
+        #  - capa de DIBUJO (overlay VECTORIAL): lineas nitidas a cualquier zoom.
+        #  - PIEZAS pintables (un clic = un numero); en modo multitono con sub-tonos.
+        # Umbrales AUTOMATICOS segun la imagen (env opcional para forzar).
+        env_edge = os.environ.get("LINEART_PIECE_EDGE")
+        env_dark = os.environ.get("LINEART_DARK")
+        piece_edge = float(env_edge) if env_edge else None      # None -> automatico
+        dark_thresh = float(env_dark) if env_dark else auto_dark_thresh(rgb)
         piece_area = float(os.environ.get("LINEART_PIECE_AREA", "0.02"))
-        dark_thresh = float(os.environ.get("LINEART_DARK", "0.32"))
-        line_overlay = line_overlay_datauri(rgb, dark_thresh=dark_thresh)
+        line_overlay = line_overlay_path(rgb, dark_thresh=dark_thresh)
         region_map, n_regions, fills, groups, clusters, palette = build_lineart(
-            rgb, n_numbers=n_colors, min_piece_area_pct=piece_area, piece_edge_thresh=piece_edge
+            rgb, n_numbers=ai_numbers, min_piece_area_pct=piece_area,
+            piece_edge_thresh=piece_edge, dark_thresh=dark_thresh, multitone=multitone,
         )
     else:
         # Perfil foto: regiones por color (cuantizacion fina + fusion).
@@ -76,9 +81,10 @@ def generate_color_by_number(
 
     doc = assemble(w, h, palette, groups, region_area, fills, edge, clusters, paths, labels)
     if line_overlay:
-        doc["lineOverlay"] = line_overlay   # capa de dibujo (siempre visible)
+        doc["lineOverlayPath"] = line_overlay   # capa de dibujo VECTORIAL (path SVG)
     doc["meta"] = {
-        "n_colors": n_colors,
+        "n_colors": ai_numbers if stylized else n_colors,
+        "multitone": multitone if stylized else None,
         "mode": "lineart" if stylized else "color",
         "min_area_pct": min_area_pct,
         "simplify_tol": simplify_tol,

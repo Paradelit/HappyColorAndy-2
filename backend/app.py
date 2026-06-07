@@ -69,6 +69,8 @@ async def generate(
     max_regions: int = Form(5000),
     clean_radius: int = Form(1),
     stylize: bool = Form(False),
+    multitone: bool = Form(True),
+    ai_numbers: int = Form(75),
 ):
     data = await _read_image(file)
     if stylize and not stylize_available():
@@ -86,6 +88,8 @@ async def generate(
             max_regions=int(max_regions),
             clean_radius=int(clean_radius),
             stylize=bool(stylize),
+            multitone=bool(multitone),
+            ai_numbers=int(ai_numbers),
         )
     except HTTPException:
         raise
