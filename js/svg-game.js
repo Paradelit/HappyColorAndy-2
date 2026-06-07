@@ -201,9 +201,9 @@ const SvgGame = {
         throw new Error('HTTP ' + res.status + ' · ' + (detail || '').slice(0, 600));
       }
       const doc = await res.json();
-      // guardar como nueva creacion (miniatura de la foto original + el doc)
+      // guardar como nueva creacion (miniatura = estado del dibujo, aun sin pintar)
       let thumb = '';
-      try { thumb = await makeThumb(f); } catch (_) { /* sin miniatura */ }
+      try { thumb = await renderStateThumb(doc, []); } catch (_) { /* sin miniatura */ }
       this.creation = {
         id: Creations.newId(), createdAt: Date.now(), updatedAt: Date.now(),
         thumb, doc, paintedIds: [], total: doc.regions.length, progress: 0,
@@ -784,8 +784,18 @@ const SvgGame = {
 
   async backToGallery() {
     clearTimeout(this._saveTimer);
+    await this.refreshThumb();  // miniatura = estado pintado actual
     await this._persist();      // guarda el progreso antes de salir
     this.showGallery();
+  },
+
+  // Regenera la miniatura de la creacion con el estado pintado actual.
+  async refreshThumb() {
+    if (!this.creation || !this.doc) return;
+    try {
+      const thumb = await renderStateThumb(this.doc, Array.from(this.paintedSet || []));
+      if (thumb) this.creation.thumb = thumb;
+    } catch (e) { /* mantiene la miniatura anterior */ }
   },
 };
 

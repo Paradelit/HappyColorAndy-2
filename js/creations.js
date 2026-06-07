@@ -81,3 +81,43 @@ async function makeThumb(file, size = 280) {
   try { img.close(); } catch (e) { /* noop */ }
   return c.toDataURL('image/jpeg', 0.72);
 }
+
+// Miniatura que refleja el ESTADO PINTADO actual: fondo blanco + las regiones ya
+// pintadas con su color real + el overlay de lineas negro encima. Si no hay nada
+// pintado, se ve solo el dibujo de lineas (como un color-by-number sin empezar).
+function renderStateThumb(doc, paintedIds, size = 280) {
+  const W = doc.width, H = doc.height;
+  const painted = new Set(paintedIds || []);
+  let body = `<rect width="${W}" height="${H}" fill="#ffffff"/>`;
+  for (const r of doc.regions) {
+    if (painted.has(r.id)) {
+      const hex = r.fill || (doc.palette[r.color] && doc.palette[r.color].hex) || '#ffffff';
+      body += `<path d="${r.d}" fill="${hex}"/>`;
+    }
+  }
+  if (doc.lineOverlayPath) body += `<path d="${doc.lineOverlayPath}" fill="#191919"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${body}</svg>`;
+  return rasterizeSvg(svg, W, H, size);
+}
+
+// Convierte una cadena SVG en un dataURI JPEG escalado a `size` (lado mayor).
+function rasterizeSvg(svgStr, W, H, size) {
+  return new Promise((resolve) => {
+    const scale = size / Math.max(W, H);
+    const tw = Math.max(1, Math.round(W * scale));
+    const th = Math.max(1, Math.round(H * scale));
+    const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = tw; c.height = th;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, tw, th);
+      ctx.drawImage(img, 0, 0, tw, th);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
+    img.src = url;
+  });
+}
