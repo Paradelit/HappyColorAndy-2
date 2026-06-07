@@ -89,6 +89,9 @@
 
   .region { fill: #fafafa; stroke: #2e2e2e; stroke-width: 1; stroke-linejoin: round; cursor: pointer; }
   .region.painted { stroke-opacity: .45; }
+  /* modo IA con capa de dibujo: las lineas las pone el overlay, las areas van en blanco sin borde */
+  #svg-canvas.has-overlay .region { stroke: none; fill: #ffffff; }
+  #svg-canvas.has-overlay .region.target { fill: url(#checker); }
   /* LOD: al alejar se ocultan bordes/numeros de regiones diminutas */
   .region.lod { stroke-opacity: 0; }
   .rlabel.lod { display: none; }

@@ -12,14 +12,39 @@ Pasos:
   4. fusionar piezas diminutas en su vecina
 """
 
+import base64
 import heapq
+import io
 from collections import defaultdict
 
 import numpy as np
-from scipy.ndimage import binary_closing, distance_transform_edt
+from PIL import Image
+from scipy.ndimage import binary_closing, binary_opening, distance_transform_edt
 from skimage.color import rgb2gray, rgb2lab
 from skimage.filters import sobel
 from skimage.measure import label as cc_label
+
+
+def line_overlay_datauri(rgb, dark_thresh: float = 0.32, line_width: int = 3) -> str:
+    """Capa de DIBUJO: las lineas finas y oscuras del dibujo en PNG transparente.
+
+    Es la "capa de tinta" que se ve siempre (antes y despues de pintar), igual que
+    en Happy Color: hace que se distinga todo el detalle (mechones, hojas...) aunque
+    las areas pintables sean mas grandes. Se quedan SOLO las lineas finas (no los
+    rellenos oscuros grandes). Devuelve un data URI 'data:image/png;base64,...'.
+    """
+    gray = rgb2gray(rgb.astype(np.float64) / 255.0)
+    dark = gray < dark_thresh
+    k = line_width * 2 + 1
+    thick = binary_opening(dark, structure=np.ones((k, k), dtype=bool))
+    lines = dark & ~thick
+
+    h, w = lines.shape
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    rgba[lines] = (25, 25, 25, 255)  # tinta casi negra
+    buf = io.BytesIO()
+    Image.fromarray(rgba, "RGBA").save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
 
 
 def detect_walls(rgb, edge_thresh: float = 0.10) -> np.ndarray:

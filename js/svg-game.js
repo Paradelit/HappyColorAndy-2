@@ -222,6 +222,23 @@ const SvgGame = {
     });
 
     svg.appendChild(paths);
+
+    // Capa de DIBUJO (overlay de lineas): se ve siempre, encima del color y debajo
+    // de los numeros. Hace que se distinga todo el detalle antes y despues de pintar.
+    if (this.doc.lineOverlay) {
+      svg.classList.add('has-overlay');
+      const img = document.createElementNS(SVGNS, 'image');
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', this.doc.lineOverlay);
+      img.setAttribute('href', this.doc.lineOverlay);
+      img.setAttribute('x', 0); img.setAttribute('y', 0);
+      img.setAttribute('width', width); img.setAttribute('height', height);
+      img.setAttribute('pointer-events', 'none');
+      img.style.imageRendering = 'auto';
+      svg.appendChild(img);
+    } else {
+      svg.classList.remove('has-overlay');
+    }
+
     svg.appendChild(labels);
   },
 

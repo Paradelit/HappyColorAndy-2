@@ -23,15 +23,17 @@ import os
 
 from PIL import Image
 
-# Prompt: dibujo a linea DETALLADO y limpio (calidad coloring-book Happy Color).
+# Prompt: ilustracion MUY detallada con tinta fina que delinea TODO (como una
+# lamina premium de paint-by-numbers). El dibujo debe leerse solo con las lineas.
 PROMPT = (
-    "Turn this photo into a detailed coloring-book illustration in the style of the "
-    "Happy Color app. Draw clean, crisp, elegant black ink outlines and KEEP the rich "
-    "detail and structure of every element (mane strands, fur direction, facial features, "
-    "individual leaves, bark, branches) so each element is clearly distinguishable. "
-    "Fill areas with flat, solid cel-shaded colors: no gradients, no photographic texture, "
-    "no noise. Keep the same composition, subject, pose and overall colors as the original "
-    "photo. High-quality, professional line-art illustration."
+    "Transform this photo into a highly detailed illustration in the style of a premium "
+    "paint-by-numbers / coloring-book artwork. Draw clean, crisp BLACK INK OUTLINES that "
+    "delineate EVERY element and detail: each strand of mane and fur, the whiskers, the "
+    "eyes, every individual leaf and twig, the bark texture of the branches, the moon and "
+    "the clouds. The whole scene must be clearly readable from the line work alone, even "
+    "before coloring. Then fill with rich, natural, FLAT colors that match the original "
+    "photo (no gradients, no photographic noise or blur). Keep the exact same composition, "
+    "pose, framing and colors as the original photo."
 )
 
 # Cadena de modelos Gemini (el mejor primero; si uno falla/sin cuota, pasa al

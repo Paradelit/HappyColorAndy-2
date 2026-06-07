@@ -1,5 +1,6 @@
 """Orquestador del pipeline foto -> color-by-number SVG (JSON)."""
 
+import os
 import time
 
 import numpy as np
@@ -7,7 +8,7 @@ import numpy as np
 from .preprocess import preprocess
 from .quantize import quantize
 from .segment import segment
-from .lineart import regions_from_lines
+from .lineart import regions_from_lines, line_overlay_datauri
 from .recolor import fills_and_groups, boundary_edge_strength, paint_clusters
 from .vectorize import vectorize
 from .labels import labels_for_regions
@@ -37,15 +38,24 @@ def generate_color_by_number(
         stylized = True
 
     # En modo IA la entrada ya es una ilustracion limpia: NO se suaviza (para no
-    # emborronar las lineas nitidas) y se procesa a mayor resolucion.
-    eff_process_size = 1500 if stylized else process_size
+    # emborronar las lineas nitidas) y se procesa a su resolucion (sin ampliar).
+    eff_process_size = 1536 if stylized else process_size
     rgb = preprocess(file_bytes, process_size=eff_process_size, denoise=not stylized)
     h, w = rgb.shape[:2]
 
+    line_overlay = None
     if stylized:
-        # SEGMENTACION POR LINEAS: cada pieza es un area encerrada por las lineas
-        # del dibujo (como Happy Color), no un trozo de color.
-        region_map, n_regions = regions_from_lines(rgb, min_area_pct=0.025)
+        # DOS CAPAS (como Happy Color):
+        #  - capa de DIBUJO (overlay): todas las lineas finas -> se distingue todo.
+        #  - areas PINTABLES: piezas mas grandes delineadas por las lineas fuertes.
+        # Ajustables sin tocar codigo: LINEART_EDGE_THRESH / LINEART_MIN_AREA / LINEART_DARK.
+        edge_thresh = float(os.environ.get("LINEART_EDGE_THRESH", "0.08"))
+        la_min_area = float(os.environ.get("LINEART_MIN_AREA", "0.04"))
+        dark_thresh = float(os.environ.get("LINEART_DARK", "0.32"))
+        line_overlay = line_overlay_datauri(rgb, dark_thresh=dark_thresh)
+        region_map, n_regions = regions_from_lines(
+            rgb, min_area_pct=la_min_area, edge_thresh=edge_thresh
+        )
     else:
         # Perfil foto: regiones por color (cuantizacion fina + fusion).
         fine_colors = int(min(120, max(n_colors * 3, 96)))
@@ -66,6 +76,8 @@ def generate_color_by_number(
     labels = labels_for_regions(region_map, n_regions)
 
     doc = assemble(w, h, palette, groups, region_area, fills, edge, clusters, paths, labels)
+    if line_overlay:
+        doc["lineOverlay"] = line_overlay   # capa de dibujo (siempre visible)
     doc["meta"] = {
         "n_colors": n_colors,
         "mode": "lineart" if stylized else "color",
