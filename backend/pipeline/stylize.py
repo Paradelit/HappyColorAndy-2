@@ -33,6 +33,14 @@ PROMPT = (
     "Keep the same composition, subject, pose and overall colors as the original."
 )
 
+# Cadena de modelos Gemini (el mejor primero; si uno falla/sin cuota, pasa al
+# siguiente). Se puede forzar uno solo con la variable STYLIZE_MODEL.
+GEMINI_MODELS = [
+    "gemini-3.1-flash-image",  # Nano Banana 2 (primario)
+    "gemini-3-pro-image",      # Nano Banana Pro (backup, mas calidad/menos cuota)
+    "gemini-2.5-flash-image",  # Nano Banana (backup)
+]
+
 # Tamanos soportados por gpt-image-1 segun proporcion.
 _SIZES = {"square": "1024x1024", "landscape": "1536x1024", "portrait": "1024x1536"}
 
@@ -62,8 +70,21 @@ def stylize(image_bytes: bytes) -> bytes:
     raise ValueError(f"STYLIZE_PROVIDER no soportado: {provider!r}")
 
 
+def _extract_image(resp):
+    """Saca los bytes de imagen de la respuesta de Gemini, o None."""
+    parts = getattr(resp, "parts", None)
+    if not parts:
+        candidates = getattr(resp, "candidates", None) or []
+        parts = candidates[0].content.parts if candidates else []
+    for part in parts:
+        inline = getattr(part, "inline_data", None)
+        if inline is not None and getattr(inline, "data", None):
+            return inline.data
+    return None
+
+
 def _stylize_gemini(image_bytes: bytes) -> bytes:
-    """Google Gemini (free tier de Google AI Studio). Import perezoso."""
+    """Google Gemini con cadena de modelos (free tier). Import perezoso."""
     try:
         from google import genai
         from google.genai import types
@@ -73,37 +94,30 @@ def _stylize_gemini(image_bytes: bytes) -> bytes:
         )
 
     client = genai.Client(api_key=os.environ["STYLIZE_API_KEY"])
-    # "Nano Banana" preview: tiene cuota diaria GRATIS (~2000/dia). La version GA
-    # (gemini-2.5-flash-image) requiere facturacion -> da 429 en free tier.
-    model = os.environ.get("STYLIZE_MODEL", "gemini-2.5-flash-image-preview")
+    # Si se fuerza un modelo concreto, se usa solo ese; si no, la cadena completa.
+    forced = os.environ.get("STYLIZE_MODEL")
+    models = [forced] if forced else GEMINI_MODELS
 
     # Normaliza a PNG para enviar.
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
+    part_img = types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png")
 
-    try:
-        resp = client.models.generate_content(
-            model=model,
-            contents=[PROMPT, types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png")],
-        )
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(
-            f"Gemini fallo (modelo '{model}'). Revisa la clave, el modelo o la cuota. Detalle: {exc}"
-        )
+    last_err = None
+    for model in models:
+        try:
+            resp = client.models.generate_content(model=model, contents=[PROMPT, part_img])
+            data = _extract_image(resp)
+            if data:
+                return data
+            last_err = RuntimeError(f"{model}: la respuesta no traia imagen")
+        except Exception as exc:  # noqa: BLE001 - probamos el siguiente modelo
+            last_err = RuntimeError(f"{model}: {exc}")
+            continue
 
-    candidates = getattr(resp, "candidates", None) or []
-    if not candidates:
-        fb = getattr(resp, "prompt_feedback", None)
-        raise RuntimeError(f"Gemini no devolvio resultado (posible bloqueo de contenido). {fb or ''}".strip())
-
-    for part in candidates[0].content.parts:
-        inline = getattr(part, "inline_data", None)
-        if inline is not None and inline.data:
-            return inline.data
     raise RuntimeError(
-        f"Gemini no devolvio imagen con el modelo '{model}'. "
-        "Prueba otro modelo con STYLIZE_MODEL (p.ej. gemini-2.0-flash-preview-image-generation)."
+        f"Todos los modelos Gemini fallaron ({', '.join(models)}). Ultimo error: {last_err}"
     )
 
 

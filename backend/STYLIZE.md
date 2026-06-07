@@ -37,16 +37,20 @@ si configuras una clave de API.
 
 ## Variables de entorno
 
-| Variable           | Por defecto                      | Para qué |
-|--------------------|----------------------------------|----------|
-| `STYLIZE_API_KEY`  | (vacío)                          | Activa el modo. Obligatoria. |
-| `STYLIZE_PROVIDER` | `gemini`                         | `gemini` (gratis) o `openai` (de pago). |
-| `STYLIZE_MODEL`    | `gemini-2.5-flash-image-preview` | "Nano Banana" preview: ~2000 imágenes/día GRATIS. |
+| Variable           | Por defecto         | Para qué |
+|--------------------|---------------------|----------|
+| `STYLIZE_API_KEY`  | (vacío)             | Activa el modo. Obligatoria. |
+| `STYLIZE_PROVIDER` | `gemini`            | `gemini` (gratis) o `openai` (de pago). |
+| `STYLIZE_MODEL`    | (cadena automática) | Fuerza un único modelo. Si no se define, usa la cadena de fallback. |
 
-> ⚠️ Usa el modelo **`-preview`** (Nano Banana). La versión GA
-> `gemini-2.5-flash-image` requiere facturación y da error 429 en el free tier.
-> Otras opciones gratis con menos cuota: `gemini-3.1-flash-image` (Nano Banana 2,
-> ~1000/día). Se cambian con `export STYLIZE_MODEL="..."`.
+**Cadena de modelos Gemini** (prueba el mejor primero; si falla o no hay cuota,
+pasa al siguiente automáticamente):
+
+1. `gemini-3.1-flash-image` — Nano Banana 2 (primario)
+2. `gemini-3-pro-image` — Nano Banana Pro (backup, más calidad)
+3. `gemini-2.5-flash-image` — Nano Banana (backup)
+
+Para forzar uno solo: `export STYLIZE_MODEL="gemini-3-pro-image"`.
 
 ## Alternativa: OpenAI (de pago)
 
