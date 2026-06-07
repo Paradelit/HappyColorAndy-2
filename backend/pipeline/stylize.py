@@ -64,8 +64,13 @@ def stylize(image_bytes: bytes) -> bytes:
 
 def _stylize_gemini(image_bytes: bytes) -> bytes:
     """Google Gemini (free tier de Google AI Studio). Import perezoso."""
-    from google import genai
-    from google.genai import types
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        raise RuntimeError(
+            "Falta la libreria 'google-genai'. Instalala con: pip install google-genai"
+        )
 
     client = genai.Client(api_key=os.environ["STYLIZE_API_KEY"])
     model = os.environ.get("STYLIZE_MODEL", "gemini-2.5-flash-image")
@@ -75,15 +80,29 @@ def _stylize_gemini(image_bytes: bytes) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
 
-    resp = client.models.generate_content(
-        model=model,
-        contents=[PROMPT, types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png")],
-    )
-    for part in resp.candidates[0].content.parts:
+    try:
+        resp = client.models.generate_content(
+            model=model,
+            contents=[PROMPT, types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png")],
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            f"Gemini fallo (modelo '{model}'). Revisa la clave, el modelo o la cuota. Detalle: {exc}"
+        )
+
+    candidates = getattr(resp, "candidates", None) or []
+    if not candidates:
+        fb = getattr(resp, "prompt_feedback", None)
+        raise RuntimeError(f"Gemini no devolvio resultado (posible bloqueo de contenido). {fb or ''}".strip())
+
+    for part in candidates[0].content.parts:
         inline = getattr(part, "inline_data", None)
         if inline is not None and inline.data:
             return inline.data
-    raise RuntimeError("La IA no devolvio imagen (revisa el modelo o la cuota).")
+    raise RuntimeError(
+        f"Gemini no devolvio imagen con el modelo '{model}'. "
+        "Prueba otro modelo con STYLIZE_MODEL (p.ej. gemini-2.0-flash-preview-image-generation)."
+    )
 
 
 def _stylize_openai(image_bytes: bytes) -> bytes:
