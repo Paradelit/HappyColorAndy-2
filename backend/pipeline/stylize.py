@@ -116,8 +116,15 @@ def _stylize_gemini(image_bytes: bytes) -> bytes:
             last_err = RuntimeError(f"{model}: {exc}")
             continue
 
+    msg = str(last_err)
+    if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "limit: 0" in msg:
+        hint = (" -> La generacion de imagenes de Gemini necesita FACTURACION activada "
+                "(free tier = 0). Activala en https://aistudio.google.com (Plan -> Upgrade) "
+                "y entra en cuota gratis de Nano Banana.")
+    else:
+        hint = ""
     raise RuntimeError(
-        f"Todos los modelos Gemini fallaron ({', '.join(models)}). Ultimo error: {last_err}"
+        f"Todos los modelos Gemini fallaron ({', '.join(models)}). Ultimo error: {last_err}{hint}"
     )
 
 
