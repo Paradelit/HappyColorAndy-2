@@ -186,6 +186,51 @@
   .finale-actions button:disabled { opacity: .55; }
   #fin-share { background: #d63384; color: #fff; }
   #victory button.ghost { margin-top: 14px; background: transparent; color: #bbb; border: none; font-weight: 600; cursor: pointer; }
+
+  /* ===== Membresía: chip de plan ===== */
+  .plan-chip { border: 1.5px solid rgba(255,255,255,.7); border-radius: 999px; padding: 8px 12px; font-weight: 700; font-size: .8rem; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; white-space: nowrap; }
+  .plan-chip.member { background: #ffd24a; color: #5a3d00; border-color: #ffd24a; }
+  .plan-chip:active { transform: scale(.96); }
+
+  /* candado IA cuando no eres miembro */
+  .ai-toggle.locked { opacity: .9; }
+  .ai-toggle .lock-badge { margin-left: auto; background: #764ba2; color: #fff; font-size: .68rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; flex: 0 0 auto; }
+
+  /* ===== Paywall ===== */
+  .paywall { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .paywall-card { background: #fff; border-radius: 20px; padding: 22px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; position: relative; }
+  .paywall-x { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border: none; border-radius: 50%; background: #f0f0f4; cursor: pointer; }
+  .paywall-card h2 { color: #333; font-size: 1.35rem; }
+  .paywall-sub { color: #888; font-size: .85rem; margin: 6px 0 16px; }
+  .plans { display: grid; gap: 12px; }
+  .plan { border: 2px solid #eee; border-radius: 14px; padding: 14px; }
+  .plan.plus { border-color: #b9a6f0; }
+  .plan.pro { border-color: #d63384; }
+  .plan.current { background: #faf8ff; }
+  .plan-name { font-weight: 800; color: #333; }
+  .plan-price { color: #764ba2; font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; }
+  .plan ul { list-style: none; margin: 0 0 12px; padding: 0; }
+  .plan li { font-size: .82rem; color: #555; padding: 3px 0 3px 20px; position: relative; }
+  .plan li::before { content: '✓'; position: absolute; left: 0; color: #4CAF50; font-weight: 800; }
+  .plan-cta { width: 100%; border: none; border-radius: 10px; padding: 11px; font-weight: 700; background: #764ba2; color: #fff; cursor: pointer; }
+  .plan.pro .plan-cta { background: #d63384; }
+  .plan-cta:disabled { background: #e6e6ec; color: #999; cursor: default; }
+  .paywall-note { text-align: center; color: #aaa; font-size: .72rem; margin-top: 14px; }
+
+  /* ===== Anuncio (mock) ===== */
+  .ad-overlay { position: fixed; inset: 0; z-index: 85; background: rgba(0,0,0,.88); display: flex; align-items: center; justify-content: center; padding: 18px; }
+  .ad-box { background: #14141c; border: 1px solid #2a2a38; border-radius: 18px; padding: 26px; width: 100%; max-width: 340px; text-align: center; color: #fff; }
+  .ad-tag { font-size: .68rem; letter-spacing: 1px; color: #888; }
+  .ad-art { font-size: 3.4rem; margin: 10px 0; }
+  .ad-label { font-weight: 700; margin-bottom: 6px; }
+  .ad-count { color: #aaa; font-size: .85rem; margin-bottom: 14px; }
+  .ad-skip { border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; background: #fff; color: #222; cursor: pointer; }
+  .ad-skip:disabled { background: #33333f; color: #888; cursor: default; }
+  .ad-foot { margin-top: 14px; font-size: .72rem; color: #777; }
+
+  /* ===== Toast ===== */
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); z-index: 90; background: #222; color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: .9rem; opacity: 0; transition: .3s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
@@ -195,6 +240,7 @@
     <div class="gal-header">
       <h1>🎨 Mis creaciones</h1>
       <div class="gal-actions">
+        <button class="plan-chip" id="plan-chip" title="Tu plan">Gratis</button>
         <button class="btn-install" id="btn-install" hidden>⬇️ Instalar</button>
         <button class="btn-new" id="btn-new">+ Nueva</button>
       </div>
@@ -309,6 +355,8 @@
     window.addEventListener('appinstalled', () => { if (installBtn) installBtn.hidden = true; });
   </script>
 
+  <script src="js/membership.js"></script>
+  <script src="js/ads.js"></script>
   <script src="js/creations.js"></script>
   <script src="js/finale.js"></script>
   <script src="js/svg-game.js"></script>

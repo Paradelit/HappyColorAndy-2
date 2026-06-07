@@ -79,6 +79,21 @@ const SvgGame = {
   bindGallery() {
     this.ui.btnNew.onclick = () => this.showUpload();
     this.ui.uploadBack.onclick = () => this.showGallery();
+    this.ui.planChip = document.getElementById('plan-chip');
+    this.ui.planChip.onclick = () => Membership.openPaywall('manual');
+    this.updatePlanChip();
+    // al cambiar de plan: refresca el chip y el estado del toggle de IA
+    document.addEventListener('plan-changed', () => {
+      this.updatePlanChip();
+      this.checkCapabilities();
+    });
+  },
+
+  updatePlanChip() {
+    const p = Membership.plan();
+    const member = Membership.isMember();
+    this.ui.planChip.textContent = member ? '✨ ' + p.name : p.name;
+    this.ui.planChip.classList.toggle('member', member);
   },
 
   hideAllViews() {
@@ -155,11 +170,20 @@ const SvgGame = {
       };
     });
     // el selector de modo solo tiene sentido en modo IA
-    u.stylize.addEventListener('change', () => this.updateModeVisibility());
+    u.stylize.addEventListener('change', () => this.onStylizeToggle());
 
     // muestra el modo IA solo si el backend tiene la clave configurada
     this.checkCapabilities();
     u.backendUrl.addEventListener('change', () => this.checkCapabilities());
+  },
+
+  // Al activar la IA sin ser miembro: revierte y abre el paywall.
+  onStylizeToggle() {
+    if (this.ui.stylize.checked && !Membership.hasAI()) {
+      this.ui.stylize.checked = false;
+      Membership.openPaywall('ai');
+    }
+    this.updateModeVisibility();
   },
 
   updateModeVisibility() {
@@ -167,16 +191,31 @@ const SvgGame = {
     this.ui.modeToggle.hidden = !on;
   },
 
+  // Muestra/oculta la insignia "🔒 Plus" en el toggle de IA.
+  setAiLock(locked) {
+    this.ui.aiToggle.classList.toggle('locked', locked);
+    let badge = this.ui.aiToggle.querySelector('.lock-badge');
+    if (locked && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'lock-badge';
+      badge.textContent = '🔒 Plus';
+      this.ui.aiToggle.appendChild(badge);
+    } else if (!locked && badge) {
+      badge.remove();
+    }
+  },
+
   async checkCapabilities() {
     const base = this.ui.backendUrl.value.replace(/\/$/, '');
+    let canAi = false;
     try {
       const res = await fetch(base + '/capabilities');
-      const cap = await res.json();
-      this.ui.aiToggle.hidden = !cap.stylize;
-      if (cap.stylize) this.ui.stylize.checked = true;  // IA por defecto si esta disponible
-    } catch (e) {
-      this.ui.aiToggle.hidden = true;  // backend no disponible aun
-    }
+      canAi = !!(await res.json()).stylize;
+    } catch (e) { canAi = false; }  // backend no disponible aun
+    this.ui.aiToggle.hidden = !canAi;
+    const member = Membership.hasAI();
+    this.ui.stylize.checked = canAi && member;   // IA por defecto solo si es miembro
+    this.setAiLock(canAi && !member);            // si no, candado "Plus"
     this.updateModeVisibility();
   },
 
@@ -192,10 +231,24 @@ const SvgGame = {
   async generate() {
     const f = this.ui.file.files[0];
     if (!f) return;
+
+    // límite de creaciones según el plan
+    const limit = Membership.creationLimit();
+    if (Number.isFinite(limit)) {
+      let count = 0;
+      try { count = (await Creations.list()).length; } catch (e) { /* ignore */ }
+      if (count >= limit) { Membership.openPaywall('limit'); return; }
+    }
+
     const base = this.ui.backendUrl.value.replace(/\/$/, '');
 
     // sin parametros: el backend auto-ajusta para maxima fidelidad
     const useAi = this.ui.stylize && this.ui.stylize.checked && !this.ui.aiToggle.hidden;
+    // la IA (mejores dibujos) requiere membresía
+    if (useAi && !Membership.hasAI()) { Membership.openPaywall('ai'); return; }
+    // usuarios free: anuncio antes de crear
+    await Ads.gate('create');
+
     const fd = new FormData();
     fd.append('file', f);
     if (useAi) {
@@ -500,11 +553,12 @@ const SvgGame = {
   },
 
   // ---------- pista: lleva la camara a una region pendiente y la hace parpadear ----------
-  hint() {
+  async hint() {
     const i = this.state.selectedColor;
     if (i < 0) return;
     const id = (this.regionsByColor[i] || []).find(id => !this.pathEls[id].classList.contains('painted'));
     if (id === undefined) return;
+    await Ads.gate('hint');   // usuarios free: anuncio antes de la pista
     const el = this.pathEls[id];
     this.centerOn(el);
     el.classList.add('hintpulse');
