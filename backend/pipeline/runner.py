@@ -26,7 +26,7 @@ def generate_color_by_number(
     clean_radius: int = 1,
     stylize: bool = False,
     multitone: bool = True,
-    ai_numbers: int = 75,
+    ai_numbers: int = 60,
 ):
     """Ejecuta el pipeline y devuelve el dict JSON listo para el frontend.
 
@@ -55,10 +55,10 @@ def generate_color_by_number(
         env_dark = os.environ.get("LINEART_DARK")
         piece_edge = float(env_edge) if env_edge else None      # None -> automatico
         dark_thresh = float(env_dark) if env_dark else auto_dark_thresh(rgb)
-        piece_area = float(os.environ.get("LINEART_PIECE_AREA", "0.02"))
+        max_click = float(os.environ.get("LINEART_MAX_CLICK_PCT", "6"))  # % maximo por clic
         line_overlay = line_overlay_path(rgb, dark_thresh=dark_thresh)
         region_map, n_regions, fills, groups, clusters, palette = build_lineart(
-            rgb, n_numbers=ai_numbers, min_piece_area_pct=piece_area,
+            rgb, n_numbers=ai_numbers, max_cluster_pct=max_click,
             piece_edge_thresh=piece_edge, dark_thresh=dark_thresh, multitone=multitone,
         )
     else:

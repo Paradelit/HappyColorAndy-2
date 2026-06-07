@@ -23,10 +23,42 @@ from scipy.ndimage import binary_closing, binary_opening, distance_transform_edt
 from skimage.color import lab2rgb, rgb2gray, rgb2lab
 from skimage.filters import sobel
 from skimage.measure import find_contours, label as cc_label
+from skimage.segmentation import slic
 from sklearn.cluster import KMeans
 from shapely.geometry import LinearRing
 
 from .quantize import quantize
+
+
+def _subdivide_large(region_map, n, rgb, max_area_px):
+    """Parte las regiones MAS GRANDES que el tope en celdas (superpixeles) para
+    que ningun clic pueda pintar mas de `max_area_px`. Las zonas pequenas y de
+    detalle no se tocan."""
+    area = np.bincount(region_map.ravel(), minlength=n)
+    big = np.where(area > max_area_px * 1.2)[0]
+    if len(big) == 0:
+        return region_map, n
+    total = region_map.size
+    n_seg = max(8, int(total / (max_area_px * 0.7)))
+    sp = slic(rgb, n_segments=n_seg, compactness=18, start_label=0, enforce_connectivity=True)
+    out = region_map.copy()
+    nxt = n
+    for r in big:
+        mask = region_map == r
+        first = True
+        for s in np.unique(sp[mask]):
+            cell = mask & (sp == s)
+            if not cell.any():
+                continue
+            if first:
+                first = False  # la primera celda conserva el id r
+                continue
+            out[cell] = nxt
+            nxt += 1
+    uniq = np.unique(out)
+    remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
+    remap[uniq] = np.arange(len(uniq))
+    return remap[out].astype(np.int32), len(uniq)
 
 
 def auto_dark_thresh(rgb) -> float:
@@ -60,10 +92,11 @@ def ink_walls(rgb, dark_thresh: float = 0.32, line_width: int = 3, close: int = 
     return binary_closing(lines, structure=np.ones((close, close), dtype=bool))
 
 
-def line_overlay_path(rgb, dark_thresh: float = 0.32, line_width: int = 3, simplify_tol: float = 0.9) -> str:
+def line_overlay_path(rgb, dark_thresh: float = 0.32, line_width: int = 7, simplify_tol: float = 0.5) -> str:
     """Capa de DIBUJO en VECTOR: las lineas de tinta como un path SVG (nitido a
-    cualquier zoom). Traza el contorno de las lineas y las rellena (fill-rule
-    evenodd). Sustituye al overlay raster para no perder calidad."""
+    cualquier zoom). `line_width` alto conserva tambien las lineas GRUESAS
+    (contornos importantes), no solo las finas. Solo se descartan los rellenos
+    oscuros muy grandes. Traza el contorno de las lineas y las rellena (evenodd)."""
     lines = _ink_lines(rgb, dark_thresh, line_width)
     padded = np.pad(lines.astype(np.uint8), 1, mode="constant", constant_values=0)
     contours = find_contours(padded, level=0.5)
@@ -225,17 +258,62 @@ def piece_walls(rgb, dark_thresh=0.32, piece_edge_thresh=0.12):
     return binary_closing(walls, structure=np.ones((3, 3), dtype=bool))
 
 
-def build_lineart(rgb, n_numbers=75, min_piece_area_pct=0.02, piece_edge_thresh=None,
-                  dark_thresh=None, fine_colors=64, multitone=True, multitone_spread=6.0):
-    """Modelo de DOS NIVELES estilo Happy Color para una ilustracion.
+def capped_clusters(region_map, n, numbers, max_area_px):
+    """Clusters = zonas contiguas del MISMO numero, pero con tope de area.
 
-    - PIEZA: area delimitada por lineas = unidad de pintado (un clic, un numero).
-    - SUB-REGION (solo modo multitono): dentro de una pieza, cada tono fiel distinto
-      (se rellenan todos al pintar la pieza). En modo PLANO, cada pieza es un unico
-      color (su media).
+    Un clic pinta un cluster. Las zonas grandes del mismo color se parten en
+    varios clusters (<= max_area_px) para que un clic no pinte medio cuadro.
+    """
+    from collections import deque
 
-    `piece_edge_thresh` / `dark_thresh` = None -> se calculan automaticamente segun
-    la imagen.
+    numbers = np.asarray(numbers)
+    area = np.bincount(region_map.ravel(), minlength=n).astype(np.int64)
+
+    adj = defaultdict(set)
+
+    def accum(a, b):
+        m = a != b
+        if not m.any():
+            return
+        lo = np.minimum(a[m], b[m]).astype(np.int64)
+        hi = np.maximum(a[m], b[m]).astype(np.int64)
+        for key in np.unique(lo * (n + 1) + hi):
+            ra, rb = int(key // (n + 1)), int(key % (n + 1))
+            adj[ra].add(rb)
+            adj[rb].add(ra)
+
+    accum(region_map[:, :-1].ravel(), region_map[:, 1:].ravel())
+    accum(region_map[:-1, :].ravel(), region_map[1:, :].ravel())
+
+    cluster = [-1] * n
+    cid = 0
+    for s in range(n):
+        if cluster[s] != -1:
+            continue
+        cluster[s] = cid
+        cur = int(area[s])
+        q = deque([s])
+        while q:
+            x = q.popleft()
+            for nb in adj.get(x, ()):
+                if cluster[nb] == -1 and numbers[nb] == numbers[s] and cur + area[nb] <= max_area_px:
+                    cluster[nb] = cid
+                    cur += int(area[nb])
+                    q.append(nb)
+        cid += 1
+    return cluster
+
+
+def build_lineart(rgb, n_numbers=60, max_cluster_pct=6.0, piece_edge_thresh=None,
+                  dark_thresh=None, fine_colors=72, multitone=True, multitone_spread=6.0):
+    """Color-by-number por LINEAS para una ilustracion (estilo Happy Color).
+
+    - Las sub-regiones se delimitan por las lineas del dibujo (+ bordes fuertes).
+    - El NUMERO va por COLOR (no por pieza): azul es un numero, marron otro -> al
+      pintar un numero solo se pintan colores de ESE numero (coherente).
+    - Un CLIC pinta una zona contigua del mismo numero, con TOPE de area
+      (max_cluster_pct % del lienzo) para que un clic no pinte medio cuadro.
+    - multitono: cada sub-region con su tono fiel. plano: el color del numero.
 
     Returns: region_map, n_regions, fills, numbers, clusters, palette
     """
@@ -245,75 +323,58 @@ def build_lineart(rgb, n_numbers=75, min_piece_area_pct=0.02, piece_edge_thresh=
     if piece_edge_thresh is None:
         piece_edge_thresh = auto_edge_thresh(rgb)
 
-    # Muros = lineas de tinta + bordes fuertes; el sombreado suave no parte la pieza.
+    # Muros = lineas de tinta + bordes fuertes (separan sub-regiones).
     walls = piece_walls(rgb, dark_thresh=dark_thresh, piece_edge_thresh=piece_edge_thresh)
 
-    # 1) Piezas (clics) delimitadas por lineas.
-    piece_map, n_pieces = _regions_from_walls(walls, rgb, min_piece_area_pct)
+    # Sub-regiones = areas de color que no cruzan lineas (conservan el detalle).
+    fine, _pal = quantize(rgb, n_colors=fine_colors, clean_radius=1)
+    masked = fine.astype(np.int64)
+    masked[walls] = -1
+    sub = cc_label(masked, background=-1, connectivity=1)
+    if (sub == 0).any() and (sub > 0).any():
+        idx = distance_transform_edt(sub == 0, return_distances=False, return_indices=True)
+        sub = sub[tuple(idx)]
+    uniq = np.unique(sub)
+    remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
+    remap[uniq] = np.arange(len(uniq))
+    region_map = remap[sub].astype(np.int32)
+    region_map, n = _merge_small(region_map, len(uniq), rgb, min_area_pct=0.006)
 
-    if multitone:
-        # 2-3) Sub-regiones = areas de (misma pieza + mismo color) sin cruzar lineas.
-        fine, _pal = quantize(rgb, n_colors=fine_colors, clean_radius=1)
-        combined = piece_map.astype(np.int64) * (int(fine.max()) + 2) + fine.astype(np.int64)
-        combined[walls] = -1
-        sub = cc_label(combined, background=-1, connectivity=1)
-        if (sub == 0).any() and (sub > 0).any():
-            idx = distance_transform_edt(sub == 0, return_distances=False, return_indices=True)
-            sub = sub[tuple(idx)]
-        uniq = np.unique(sub)
-        remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
-        remap[uniq] = np.arange(len(uniq))
-        region_map = remap[sub].astype(np.int32)
-        region_map, n = _merge_small(region_map, len(uniq), rgb, min_area_pct=0.008)
-        flat_r = region_map.ravel()
-        _, first_idx = np.unique(flat_r, return_index=True)
-        region_piece = piece_map.ravel()[first_idx].astype(np.int64)
-    else:
-        # Modo PLANO: cada pieza = una region de un solo color (su media).
-        region_map, n = piece_map, n_pieces
-        region_piece = np.arange(n, dtype=np.int64)
-        flat_r = region_map.ravel()
+    # Subdividir zonas grandes para respetar el tope de area por clic.
+    max_area_px = max(1, int(h * w * (max_cluster_pct / 100.0)))
+    region_map, n = _subdivide_large(region_map, n, rgb, max_area_px)
 
     means = _region_means_u8(region_map, n, rgb)
-    fills = [_hex(*means[i]) for i in range(n)]
 
-    # cluster = pieza (ids contiguos)
-    upi = np.unique(region_piece)
-    pmap = {p: i for i, p in enumerate(upi)}
-    clusters = [pmap[int(region_piece[i])] for i in range(n)]
-    n_clusters = len(upi)
+    # NUMERO por color de la sub-region (coherente: azul!=marron).
+    means_lab = rgb2lab(means.reshape(1, -1, 3) / 255.0).reshape(-1, 3)
+    k = int(max(1, min(n_numbers, n)))
+    km = KMeans(n_clusters=k, n_init=4, random_state=42).fit(means_lab)
+    numbers = km.labels_.astype(int).tolist()
+    centers = np.round(np.clip(lab2rgb(km.cluster_centers_.reshape(1, -1, 3)), 0, 1) * 255.0)
+    centers = centers.reshape(-1, 3).astype(np.uint8)
 
-    # 5) Color medio de cada pieza (ponderado por area) -> agrupar en numeros.
-    area = np.bincount(flat_r, minlength=n).astype(np.float64)
-    psum = np.zeros((n_clusters, 3))
-    parea = np.zeros(n_clusters)
-    for i in range(n):
-        c = clusters[i]
-        psum[c] += means[i].astype(np.float64) * area[i]
-        parea[c] += area[i]
-    parea[parea == 0] = 1
-    piece_mean = psum / parea[:, None]
-    piece_lab = rgb2lab(piece_mean.reshape(1, -1, 3) / 255.0).reshape(-1, 3)
-    k = int(max(1, min(n_numbers, n_clusters)))
-    km = KMeans(n_clusters=k, n_init=4, random_state=42).fit(piece_lab)
-    piece_number = km.labels_.astype(int)
-    numbers = [int(piece_number[clusters[i]]) for i in range(n)]
+    # CLUSTERS (clics) con tope de area.
+    clusters = capped_clusters(region_map, n, numbers, max_area_px)
 
-    # 6) Paleta: color representativo + multitono (si sus piezas llevan varios tonos).
-    centers = (np.clip(lab2rgb(km.cluster_centers_.reshape(1, -1, 3)), 0, 1) * 255.0)
-    centers = np.round(centers).reshape(-1, 3).astype(np.uint8)
+    # FILLS: multitono = tono fiel; plano = color del numero.
+    if multitone:
+        fills = [_hex(*means[i]) for i in range(n)]
+    else:
+        fills = [_hex(*centers[numbers[i]]) for i in range(n)]
+
+    # PALETA: representante + multitono (si el numero tiene varios tonos).
     palette = []
     for g in range(k):
         cols = means[[i for i in range(n) if numbers[i] == g]]
-        if len(cols) > 1:
+        if multitone and len(cols) > 1:
             spread = float(np.mean(np.std(cols.astype(np.float64), axis=0)))
             lum = cols.astype(np.float64) @ np.array([0.299, 0.587, 0.114])
             order = np.argsort(lum)
-            picks = order[[0, len(order) // 2, len(order) - 1]]
-            swatches = [_hex(*cols[p]) for p in picks]
+            swatches = [_hex(*cols[p]) for p in order[[0, len(order) // 2, len(order) - 1]]]
         else:
             spread = 0.0
-            swatches = [_hex(*cols[0])] if len(cols) else [_hex(*centers[g])]
+            swatches = [_hex(*centers[g])]
         palette.append({
             "index": g, "hex": _hex(*centers[g]),
             "multitone": bool(multitone and spread > multitone_spread), "swatches": swatches,

@@ -70,7 +70,7 @@ async def generate(
     clean_radius: int = Form(1),
     stylize: bool = Form(False),
     multitone: bool = Form(True),
-    ai_numbers: int = Form(75),
+    ai_numbers: int = Form(60),
 ):
     data = await _read_image(file)
     if stylize and not stylize_available():
