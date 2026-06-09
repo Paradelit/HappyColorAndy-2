@@ -6,10 +6,8 @@ import time
 import numpy as np
 
 from .preprocess import preprocess
-from .quantize import quantize
-from .segment import segment
-from .lineart import build_lineart, line_overlay_path, auto_dark_thresh
-from .recolor import fills_and_groups, boundary_edge_strength, paint_clusters
+from .lineart import build_lineart, build_photo, line_overlay_path, number_overlay_path, auto_dark_thresh
+from .recolor import boundary_edge_strength
 from .vectorize import vectorize
 from .labels import labels_for_regions
 from .serialize import assemble
@@ -18,20 +16,22 @@ from .stylize import stylize as ai_stylize
 
 def generate_color_by_number(
     file_bytes: bytes,
-    n_colors: int = 36,
-    min_area_pct: float = 0.02,
+    n_colors: int = 36,        # legacy (sin uso): se mantiene por compatibilidad del API
+    min_area_pct: float = 0.02,   # legacy (sin uso)
     simplify_tol: float = 1.4,
-    process_size: int = 1300,
-    max_regions: int = 5000,
-    clean_radius: int = 1,
+    process_size: int = 1300,     # legacy (sin uso): ambos modos procesan a 1536
+    max_regions: int = 5000,      # legacy (sin uso)
+    clean_radius: int = 1,        # legacy (sin uso)
     stylize: bool = False,
     multitone: bool = True,
     ai_numbers: int = 60,
 ):
     """Ejecuta el pipeline y devuelve el dict JSON listo para el frontend.
 
-    Si `stylize` es True, primero convierte la foto en una ilustracion limpia con
-    IA (estilo Happy Color) y hace el color-by-number de esa ilustracion.
+    Ambos modos comparten el MISMO pipeline de dos niveles (dibujo vectorial +
+    piezas pintables). Si `stylize` es True, primero convierte la foto en una
+    ilustracion limpia con IA y las lineas salen de la tinta dibujada; si es
+    False, las lineas salen de las fronteras entre numeros de la propia foto.
     """
     t0 = time.time()
     stylized = False
@@ -39,39 +39,37 @@ def generate_color_by_number(
         file_bytes = ai_stylize(file_bytes)   # foto -> ilustracion (IA)
         stylized = True
 
-    # En modo IA la entrada ya es una ilustracion limpia: NO se suaviza (para no
-    # emborronar las lineas nitidas) y se procesa a su resolucion (sin ampliar).
-    eff_process_size = 1536 if stylized else process_size
+    # MISMO pipeline para ambos modos; lo unico que cambia es la entrada (foto u
+    # ilustracion IA) y de donde salen las lineas. En modo IA la entrada ya es
+    # una ilustracion limpia: NO se suaviza (para no emborronar la tinta).
+    eff_process_size = 1536
     rgb = preprocess(file_bytes, process_size=eff_process_size, denoise=not stylized)
     h, w = rgb.shape[:2]
 
-    line_overlay = None
+    # DOS NIVELES (como Happy Color) en ambos modos:
+    #  - capa de DIBUJO (overlay VECTORIAL): lineas nitidas a cualquier zoom.
+    #  - PIEZAS pintables (un clic = un numero); en modo multitono con sub-tonos.
+    max_click = float(os.environ.get("LINEART_MAX_CLICK_PCT", "6"))  # % maximo por clic
+
     if stylized:
-        # DOS NIVELES (como Happy Color):
-        #  - capa de DIBUJO (overlay VECTORIAL): lineas nitidas a cualquier zoom.
-        #  - PIEZAS pintables (un clic = un numero); en modo multitono con sub-tonos.
-        # Umbrales AUTOMATICOS segun la imagen (env opcional para forzar).
+        # Ilustracion: las lineas son la TINTA dibujada (umbrales automaticos,
+        # env opcional para forzar).
         env_edge = os.environ.get("LINEART_PIECE_EDGE")
         env_dark = os.environ.get("LINEART_DARK")
         piece_edge = float(env_edge) if env_edge else None      # None -> automatico
         dark_thresh = float(env_dark) if env_dark else auto_dark_thresh(rgb)
-        max_click = float(os.environ.get("LINEART_MAX_CLICK_PCT", "6"))  # % maximo por clic
-        line_overlay = line_overlay_path(rgb, dark_thresh=dark_thresh)
         region_map, n_regions, fills, groups, clusters, palette = build_lineart(
             rgb, n_numbers=ai_numbers, max_cluster_pct=max_click,
             piece_edge_thresh=piece_edge, dark_thresh=dark_thresh, multitone=multitone,
         )
+        line_overlay = line_overlay_path(rgb, dark_thresh=dark_thresh)
     else:
-        # Perfil foto: regiones por color (cuantizacion fina + fusion).
-        fine_colors = int(min(120, max(n_colors * 3, 96)))
-        label_image, fine_palette = quantize(rgb, n_colors=fine_colors, clean_radius=clean_radius)
-        region_map, _fine_color, _area = segment(
-            label_image, fine_palette, min_area_pct=min_area_pct, max_regions=max_regions
+        # Foto: sin tinta que detectar; mismas capacidades posterizando directo
+        # a los numeros, y el dibujo son las fronteras entre numeros.
+        region_map, n_regions, fills, groups, clusters, palette = build_photo(
+            rgb, n_numbers=ai_numbers, max_cluster_pct=max_click, multitone=multitone,
         )
-        n_regions = len(_area)
-        # Color fiel por region + agrupacion en numeros + clusters por color contiguo.
-        fills, groups, palette = fills_and_groups(region_map, n_regions, rgb, n_groups=n_colors)
-        clusters = paint_clusters(region_map, n_regions, groups)
+        line_overlay = number_overlay_path(region_map, groups)
 
     region_area = np.bincount(region_map.ravel(), minlength=n_regions).astype(int).tolist()
     edge = boundary_edge_strength(region_map, n_regions, rgb)
@@ -83,14 +81,11 @@ def generate_color_by_number(
     if line_overlay:
         doc["lineOverlayPath"] = line_overlay   # capa de dibujo VECTORIAL (path SVG)
     doc["meta"] = {
-        "n_colors": ai_numbers if stylized else n_colors,
-        "multitone": multitone if stylized else None,
-        "mode": "lineart" if stylized else "color",
-        "min_area_pct": min_area_pct,
+        "n_colors": ai_numbers,
+        "multitone": multitone,
+        "mode": "lineart" if stylized else "photo-lineart",
         "simplify_tol": simplify_tol,
         "process_size": eff_process_size,
-        "max_regions": max_regions,
-        "clean_radius": clean_radius,
         "stylized": stylized,
         "n_regions": len(doc["regions"]),
         "elapsed_ms": int((time.time() - t0) * 1000),

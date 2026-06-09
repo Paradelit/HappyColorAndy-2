@@ -35,14 +35,18 @@ def resize_longest(rgb: np.ndarray, longest: int) -> np.ndarray:
 
 
 def smooth(rgb: np.ndarray, size: int = 3) -> np.ndarray:
-    """Quita ruido/speckle PRESERVANDO el detalle (filtro de mediana ligero).
+    """Aplana el ruido PRESERVANDO los bordes (mediana ligera + TV suave).
 
-    A diferencia del denoising TV (que aplanaba y "derretia" el detalle), la
-    mediana mantiene los bordes y los rasgos finos -> el resultado final se
-    parece mucho mas al original. La limpieza de fronteras la hace luego el
-    filtro de mayoria sobre las etiquetas.
+    La mediana quita el speckle; el denoising por Variacion Total con peso BAJO
+    aplana el grano de las zonas lisas (cielos, degradados) sin derretir los
+    bordes -> las fronteras de la posterizacion salen como curvas limpias en
+    vez de "gusanos" de ruido.
     """
-    return median_filter(rgb, size=(size, size, 1))
+    from skimage.restoration import denoise_tv_chambolle
+
+    out = median_filter(rgb, size=(size, size, 1))
+    out = denoise_tv_chambolle(out.astype(np.float64) / 255.0, weight=0.08, channel_axis=-1)
+    return np.clip(np.round(out * 255.0), 0, 255).astype(np.uint8)
 
 
 def preprocess(file_bytes: bytes, process_size: int = 1200, denoise: bool = True) -> np.ndarray:

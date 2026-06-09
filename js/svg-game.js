@@ -169,7 +169,6 @@ const SvgGame = {
         this.multitone = (b.dataset.mode === 'multi');
       };
     });
-    // el selector de modo solo tiene sentido en modo IA
     u.stylize.addEventListener('change', () => this.onStylizeToggle());
 
     // muestra el modo IA solo si el backend tiene la clave configurada
@@ -187,8 +186,8 @@ const SvgGame = {
   },
 
   updateModeVisibility() {
-    const on = !this.ui.aiToggle.hidden && this.ui.stylize.checked;
-    this.ui.modeToggle.hidden = !on;
+    // multitono / colores planos aplica a AMBOS modos (con y sin IA)
+    this.ui.modeToggle.hidden = false;
   },
 
   // Muestra/oculta la insignia "🔒 Plus" en el toggle de IA.
@@ -251,10 +250,8 @@ const SvgGame = {
 
     const fd = new FormData();
     fd.append('file', f);
-    if (useAi) {
-      fd.append('stylize', 'true');
-      fd.append('multitone', this.multitone ? 'true' : 'false');
-    }
+    fd.append('multitone', this.multitone ? 'true' : 'false');
+    if (useAi) fd.append('stylize', 'true');
 
     this.ui.err.textContent = '';
     this.ui.loadingText.textContent = useAi ? 'Creando ilustración con IA…' : 'Generando tu obra…';

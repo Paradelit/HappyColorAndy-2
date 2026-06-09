@@ -97,8 +97,28 @@ def line_overlay_path(rgb, dark_thresh: float = 0.32, line_width: int = 7, simpl
     cualquier zoom). `line_width` alto conserva tambien las lineas GRUESAS
     (contornos importantes), no solo las finas. Solo se descartan los rellenos
     oscuros muy grandes. Traza el contorno de las lineas y las rellena (evenodd)."""
-    lines = _ink_lines(rgb, dark_thresh, line_width)
-    padded = np.pad(lines.astype(np.uint8), 1, mode="constant", constant_values=0)
+    return _mask_to_path(_ink_lines(rgb, dark_thresh, line_width), simplify_tol)
+
+
+def number_overlay_path(region_map, numbers, simplify_tol: float = 0.6, thickness: int = 2) -> str:
+    """Capa de DIBUJO en VECTOR para FOTOS (sin tinta que detectar): traza las
+    fronteras donde cambia el NUMERO a pintar, como un libro de colorear hecho
+    de la foto. Las fronteras entre piezas del MISMO numero (sub-tonos del
+    multitono, celdas de subdivision) no se dibujan, igual que en el modo IA
+    la tinta no marca los sombreados."""
+    nums = np.asarray(numbers, dtype=np.int32)[region_map]
+    edges = np.zeros(nums.shape, dtype=bool)
+    edges[:, 1:] |= nums[:, 1:] != nums[:, :-1]
+    edges[1:, :] |= nums[1:, :] != nums[:-1, :]
+    if thickness > 1:
+        from scipy.ndimage import binary_dilation
+        edges = binary_dilation(edges, structure=np.ones((thickness, thickness), dtype=bool))
+    return _mask_to_path(edges, simplify_tol)
+
+
+def _mask_to_path(mask, simplify_tol: float = 0.5) -> str:
+    """Mascara booleana -> path SVG (contornos rellenables con evenodd)."""
+    padded = np.pad(mask.astype(np.uint8), 1, mode="constant", constant_values=0)
     contours = find_contours(padded, level=0.5)
     subs = []
     for c in contours:
@@ -304,6 +324,79 @@ def capped_clusters(region_map, n, numbers, max_area_px):
     return cluster
 
 
+def _build_palette(numbers, means, centers, k, multitone, multitone_spread):
+    """Paleta de la UI: representante por numero + swatches si es multitono."""
+    n = len(numbers)
+    palette = []
+    for g in range(k):
+        cols = means[[i for i in range(n) if numbers[i] == g]]
+        if multitone and len(cols) > 1:
+            spread = float(np.mean(np.std(cols.astype(np.float64), axis=0)))
+            lum = cols.astype(np.float64) @ np.array([0.299, 0.587, 0.114])
+            order = np.argsort(lum)
+            swatches = [_hex(*cols[p]) for p in order[[0, len(order) // 2, len(order) - 1]]]
+        else:
+            spread = 0.0
+            swatches = [_hex(*centers[g])]
+        palette.append({
+            "index": g, "hex": _hex(*centers[g]),
+            "multitone": bool(multitone and spread > multitone_spread), "swatches": swatches,
+        })
+    return palette
+
+
+def build_photo(rgb, n_numbers=60, max_cluster_pct=6.0, multitone=True,
+                multitone_spread=6.0, clean_radius=4, min_piece_pct=0.05):
+    """Color-by-number para FOTOS con las MISMAS capacidades que el modo IA.
+
+    Una foto no tiene tinta que detectar, asi que el "dibujo" se construye
+    posterizando directamente a `n_numbers` colores (cuantizacion con muestreo
+    sesgado a detalle + filtro de mayoria fuerte que elimina el confeti del
+    ruido). Las piezas son las zonas contiguas de cada numero, y las lineas las
+    fronteras entre numeros: el aspecto "libro de colorear" del modo IA.
+
+    Mismas garantias: numero por COLOR, tope de area por clic, multitono/plano.
+
+    Returns: region_map, n_regions, fills, numbers, clusters, palette
+    """
+    h, w = rgb.shape[:2]
+
+    # Posterizado = asignacion de numeros por pixel, ya limpia de ruido.
+    nmap, pal = quantize(rgb, n_colors=n_numbers, clean_radius=clean_radius)
+    k = len(pal)
+    centers = np.array([p["rgb"] for p in pal], dtype=np.uint8)
+
+    # Piezas = zonas contiguas del mismo numero; se funden las diminutas.
+    comp = cc_label(nmap, connectivity=1)
+    uniq = np.unique(comp)
+    remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
+    remap[uniq] = np.arange(len(uniq))
+    region_map = remap[comp].astype(np.int32)
+    region_map, n = _merge_small(region_map, len(uniq), rgb, min_area_pct=min_piece_pct)
+
+    # Tope de area por clic: subdividir piezas enormes (cielos, fondos).
+    max_area_px = max(1, int(h * w * (max_cluster_pct / 100.0)))
+    region_map, n = _subdivide_large(region_map, n, rgb, max_area_px)
+
+    # Numero de cada pieza = numero mas frecuente entre sus pixeles.
+    flat_r = region_map.ravel()
+    flat_n = nmap.ravel().astype(np.int64)
+    counts = np.bincount(flat_r * k + flat_n, minlength=n * k).reshape(n, k)
+    numbers = counts.argmax(axis=1).astype(int).tolist()
+
+    means = _region_means_u8(region_map, n, rgb)
+    clusters = capped_clusters(region_map, n, numbers, max_area_px)
+
+    # FILLS: multitono = tono fiel de la pieza; plano = color del numero.
+    if multitone:
+        fills = [_hex(*means[i]) for i in range(n)]
+    else:
+        fills = [_hex(*centers[numbers[i]]) for i in range(n)]
+
+    palette = _build_palette(numbers, means, centers, k, multitone, multitone_spread)
+    return region_map, n, fills, numbers, clusters, palette
+
+
 def build_lineart(rgb, n_numbers=60, max_cluster_pct=6.0, piece_edge_thresh=None,
                   dark_thresh=None, fine_colors=72, multitone=True, multitone_spread=6.0):
     """Color-by-number por LINEAS para una ilustracion (estilo Happy Color).
@@ -364,20 +457,5 @@ def build_lineart(rgb, n_numbers=60, max_cluster_pct=6.0, piece_edge_thresh=None
         fills = [_hex(*centers[numbers[i]]) for i in range(n)]
 
     # PALETA: representante + multitono (si el numero tiene varios tonos).
-    palette = []
-    for g in range(k):
-        cols = means[[i for i in range(n) if numbers[i] == g]]
-        if multitone and len(cols) > 1:
-            spread = float(np.mean(np.std(cols.astype(np.float64), axis=0)))
-            lum = cols.astype(np.float64) @ np.array([0.299, 0.587, 0.114])
-            order = np.argsort(lum)
-            swatches = [_hex(*cols[p]) for p in order[[0, len(order) // 2, len(order) - 1]]]
-        else:
-            spread = 0.0
-            swatches = [_hex(*centers[g])]
-        palette.append({
-            "index": g, "hex": _hex(*centers[g]),
-            "multitone": bool(multitone and spread > multitone_spread), "swatches": swatches,
-        })
-
+    palette = _build_palette(numbers, means, centers, k, multitone, multitone_spread)
     return region_map, n, fills, numbers, clusters, palette
