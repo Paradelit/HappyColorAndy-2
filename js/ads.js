@@ -26,7 +26,7 @@ const Ads = {
           <div class="ad-label">${label}</div>
           <div class="ad-count"><span id="ad-left">${left}</span>s</div>
           <button class="ad-skip" disabled>Saltar</button>
-          <div class="ad-foot">Sin anuncios con Plus o Pro</div>
+          <div class="ad-foot">Sin anuncios con Plus (€5, pago único)</div>
         </div>`;
       document.body.appendChild(ov);
 

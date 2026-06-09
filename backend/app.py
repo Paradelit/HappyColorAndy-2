@@ -27,8 +27,10 @@ from pipeline.preprocess import preprocess
 from pipeline.quantize import quantize
 from pipeline.segment import segment
 from pipeline.stylize import stylize_available
+from accounts import router as accounts_router
 
 app = FastAPI(title="HappyColor Foto -> SVG", version="1.0")
+app.include_router(accounts_router)
 
 # CORS: en produccion el backend sirve tambien el frontend (mismo origen), pero
 # se deja configurable por si el frontend se hospeda aparte. CORS_ORIGINS =

@@ -55,13 +55,40 @@ const SvgGame = {
       galEmpty: document.getElementById('gal-empty'),
       btnNew: document.getElementById('btn-new'),
       uploadBack: document.getElementById('upload-back'),
+      landingView: document.getElementById('landing-view'),
+      authView: document.getElementById('auth-view'),
+      tutorial: document.getElementById('tutorial'),
+      toolFinale: document.getElementById('tool-finale'),
+      hintBadge: document.getElementById('hint-badge'),
     };
-    this.applyDefaultBackend();   // antes de bindUpload (que consulta capabilities)
+    this.applyDefaultBackend();
     this.bindUpload();
     this.bindCanvas();
     this.bindGallery();
     this.bindFinale();
-    this.showGallery();   // la home es "Mis creaciones"
+    this.bindLanding();
+    this.bindAuth();
+    this.bindTutorial();
+    this.route();
+  },
+
+  // Decide la primera vista: sesión -> app; invitado -> app; nadie -> landing.
+  async route() {
+    // pinta la galería ya si parece haber sesión (la validación va detrás)
+    if (Auth.token() || Auth.isGuest()) this.showGallery();
+    const user = await Auth.restore();
+    if (user || Auth.isGuest()) {
+      this.enterApp();
+      if (user) Auth.syncAll().then(() => this.renderGallery());  // progreso de la cuenta
+    } else {
+      this.showLanding();
+    }
+  },
+
+  // Entra a la app (galería) y muestra el tutorial solo la primera vez.
+  enterApp() {
+    this.showGallery();
+    if (!this.tutorialSeen()) this.showTutorial();
   },
 
   // URL del backend: por defecto el mismo servidor que sirve la web (relativa).
@@ -81,12 +108,28 @@ const SvgGame = {
     this.ui.uploadBack.onclick = () => this.showGallery();
     this.ui.planChip = document.getElementById('plan-chip');
     this.ui.planChip.onclick = () => Membership.openPaywall('manual');
+    this.ui.accountBtn = document.getElementById('btn-account');
+    this.ui.accountBtn.onclick = () => this.onAccountClick();
     this.updatePlanChip();
-    // al cambiar de plan: refresca el chip y el estado del toggle de IA
     document.addEventListener('plan-changed', () => {
       this.updatePlanChip();
-      this.checkCapabilities();
+      this.updateHintBadge();
     });
+    document.addEventListener('hints-changed', () => this.updateHintBadge());
+  },
+
+  // "Salir" con sesión; "Entrar" como invitado.
+  onAccountClick() {
+    if (Auth.isLogged()) {
+      Auth.logout();
+      this.showLanding();
+    } else {
+      this.showAuth('login');
+    }
+  },
+
+  updateAccountBtn() {
+    this.ui.accountBtn.textContent = Auth.isLogged() ? 'Salir' : 'Entrar';
   },
 
   updatePlanChip() {
@@ -97,9 +140,16 @@ const SvgGame = {
   },
 
   hideAllViews() {
+    this.ui.landingView.style.display = 'none';
+    this.ui.authView.style.display = 'none';
     this.ui.galleryView.style.display = 'none';
     this.ui.uploadView.style.display = 'none';
     this.ui.gameView.style.display = 'none';
+  },
+
+  showLanding() {
+    this.hideAllViews();
+    this.ui.landingView.style.display = 'flex';
   },
 
   showUpload() {
@@ -107,9 +157,120 @@ const SvgGame = {
     this.ui.uploadView.style.display = 'flex';
   },
 
+  // ---------- landing + login ----------
+  bindLanding() {
+    document.getElementById('landing-login').onclick = () => this.showAuth('login');
+    document.getElementById('landing-cta').onclick = () => this.showAuth('register');
+    document.getElementById('landing-guest').onclick = () => {
+      Auth.setGuest(true);
+      this.enterApp();
+    };
+  },
+
+  showAuth(mode) {
+    this.authMode = mode === 'login' ? 'login' : 'register';
+    const login = this.authMode === 'login';
+    document.getElementById('auth-title').textContent = login ? 'Entrar' : 'Crear cuenta';
+    document.getElementById('auth-submit').textContent = login ? 'Entrar' : 'Crear cuenta';
+    document.getElementById('auth-switch').innerHTML = login
+      ? '¿No tienes cuenta? <a id="auth-toggle">Crear cuenta</a>'
+      : '¿Ya tienes cuenta? <a id="auth-toggle">Entrar</a>';
+    document.getElementById('auth-toggle').onclick = () =>
+      this.showAuth(login ? 'register' : 'login');
+    document.getElementById('auth-err').textContent = '';
+    this.hideAllViews();
+    this.ui.authView.style.display = 'flex';
+  },
+
+  bindAuth() {
+    document.getElementById('auth-back').onclick = () => this.showLanding();
+    document.getElementById('auth-submit').onclick = () => this.submitAuth();
+    document.getElementById('auth-pass').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.submitAuth();
+    });
+  },
+
+  async submitAuth() {
+    const email = document.getElementById('auth-email').value.trim();
+    const pass = document.getElementById('auth-pass').value;
+    const err = document.getElementById('auth-err');
+    const btn = document.getElementById('auth-submit');
+    err.textContent = '';
+    if (!email || pass.length < 6) {
+      err.textContent = 'Escribe tu email y una contraseña de al menos 6 caracteres.';
+      return;
+    }
+    btn.disabled = true;
+    const prev = btn.textContent;
+    btn.textContent = 'Un momento…';
+    try {
+      if (this.authMode === 'login') await Auth.login(email, pass);
+      else await Auth.register(email, pass);
+      await Auth.syncAll();          // fusiona lo local con la cuenta
+      this.enterApp();
+    } catch (e) {
+      err.textContent = (e instanceof TypeError)
+        ? 'No hay conexión con el servidor. Prueba de nuevo.'
+        : e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prev;
+    }
+  },
+
+  // ---------- tutorial de primera vez ----------
+  TUTORIAL_STEPS: [
+    { e: '📷', t: 'Sube una foto', x: 'Convertimos tu foto en un dibujo numerado, listo para pintar.' },
+    { e: '🎨', t: 'Pinta por números', x: 'Elige un color de la paleta y toca las zonas que llevan su número.' },
+    { e: '💡', t: 'Pistas y zoom', x: 'Si te pierdes, la pista te lleva a una zona (tienes 3 gratis). Pellizca para hacer zoom y usa ⌖ para centrar.' },
+    { e: '🎬', t: 'Comparte tu obra', x: 'Al terminar verás el timelapse de tu pintura para descargarlo o compartirlo.' },
+  ],
+
+  tutorialSeen() {
+    if (Auth.isLogged() && Auth.user.tutorialDone) return true;
+    return localStorage.getItem('andycolor_tutorial_done') === '1';
+  },
+
+  markTutorialDone() {
+    localStorage.setItem('andycolor_tutorial_done', '1');
+    if (Auth.isLogged()) Auth.saveFlags({ tutorialDone: true });
+  },
+
+  bindTutorial() {
+    document.getElementById('tut-skip').onclick = () => this.closeTutorial();
+    document.getElementById('tut-next').onclick = () => {
+      if (this.tutStep >= this.TUTORIAL_STEPS.length - 1) this.closeTutorial();
+      else this.renderTutorialStep(this.tutStep + 1);
+    };
+  },
+
+  showTutorial() {
+    this.ui.tutorial.style.display = 'flex';
+    this.renderTutorialStep(0);
+  },
+
+  renderTutorialStep(i) {
+    this.tutStep = i;
+    const s = this.TUTORIAL_STEPS[i];
+    document.getElementById('tut-emoji').textContent = s.e;
+    document.getElementById('tut-title').textContent = s.t;
+    document.getElementById('tut-text').textContent = s.x;
+    document.getElementById('tut-dots').innerHTML =
+      this.TUTORIAL_STEPS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
+    document.getElementById('tut-next').textContent =
+      i >= this.TUTORIAL_STEPS.length - 1 ? '¡A pintar!' : 'Siguiente';
+  },
+
+  closeTutorial() {
+    this.ui.tutorial.style.display = 'none';
+    this.markTutorialDone();
+  },
+
   async showGallery() {
     this.hideAllViews();
     this.ui.galleryView.style.display = 'flex';
+    this.updateAccountBtn();
+    this.updatePlanChip();
     await this.renderGallery();
   },
 
@@ -131,7 +292,11 @@ const SvgGame = {
       card.querySelector('.meta').onclick = () => this.resumeCreation(c.id);
       card.querySelector('.del').onclick = async (e) => {
         e.stopPropagation();
-        if (confirm('¿Borrar esta creación?')) { await Creations.remove(c.id); this.renderGallery(); }
+        if (confirm('¿Borrar esta creación?')) {
+          await Creations.remove(c.id);
+          Auth.deleteCreation(c.id);
+          this.renderGallery();
+        }
       };
       this.ui.galGrid.appendChild(card);
     });
@@ -169,53 +334,9 @@ const SvgGame = {
         this.multitone = (b.dataset.mode === 'multi');
       };
     });
-    u.stylize.addEventListener('change', () => this.onStylizeToggle());
-
-    // muestra el modo IA solo si el backend tiene la clave configurada
-    this.checkCapabilities();
-    u.backendUrl.addEventListener('change', () => this.checkCapabilities());
-  },
-
-  // Al activar la IA sin ser miembro: revierte y abre el paywall.
-  onStylizeToggle() {
-    if (this.ui.stylize.checked && !Membership.hasAI()) {
-      this.ui.stylize.checked = false;
-      Membership.openPaywall('ai');
-    }
-    this.updateModeVisibility();
-  },
-
-  updateModeVisibility() {
-    // multitono / colores planos aplica a AMBOS modos (con y sin IA)
-    this.ui.modeToggle.hidden = false;
-  },
-
-  // Muestra/oculta la insignia "🔒 Plus" en el toggle de IA.
-  setAiLock(locked) {
-    this.ui.aiToggle.classList.toggle('locked', locked);
-    let badge = this.ui.aiToggle.querySelector('.lock-badge');
-    if (locked && !badge) {
-      badge = document.createElement('span');
-      badge.className = 'lock-badge';
-      badge.textContent = '🔒 Plus';
-      this.ui.aiToggle.appendChild(badge);
-    } else if (!locked && badge) {
-      badge.remove();
-    }
-  },
-
-  async checkCapabilities() {
-    const base = this.ui.backendUrl.value.replace(/\/$/, '');
-    let canAi = false;
-    try {
-      const res = await fetch(base + '/capabilities');
-      canAi = !!(await res.json()).stylize;
-    } catch (e) { canAi = false; }  // backend no disponible aun
-    this.ui.aiToggle.hidden = !canAi;
-    const member = Membership.hasAI();
-    this.ui.stylize.checked = canAi && member;   // IA por defecto solo si es miembro
-    this.setAiLock(canAi && !member);            // si no, candado "Plus"
-    this.updateModeVisibility();
+    // v1 sin modo IA: el toggle queda oculto (volverá con "imagina tu foto" + IA)
+    this.ui.aiToggle.hidden = true;
+    this.ui.modeToggle.hidden = false;   // multitono / colores planos, siempre
   },
 
   onFilePicked() {
@@ -230,32 +351,17 @@ const SvgGame = {
   async generate() {
     const f = this.ui.file.files[0];
     if (!f) return;
-
-    // límite de creaciones según el plan
-    const limit = Membership.creationLimit();
-    if (Number.isFinite(limit)) {
-      let count = 0;
-      try { count = (await Creations.list()).length; } catch (e) { /* ignore */ }
-      if (count >= limit) { Membership.openPaywall('limit'); return; }
-    }
-
     const base = this.ui.backendUrl.value.replace(/\/$/, '');
-
-    // sin parametros: el backend auto-ajusta para maxima fidelidad
-    const useAi = this.ui.stylize && this.ui.stylize.checked && !this.ui.aiToggle.hidden;
-    // la IA (mejores dibujos) requiere membresía
-    if (useAi && !Membership.hasAI()) { Membership.openPaywall('ai'); return; }
-    // usuarios free: anuncio antes de crear
-    await Ads.gate('create');
 
     const fd = new FormData();
     fd.append('file', f);
     fd.append('multitone', this.multitone ? 'true' : 'false');
-    if (useAi) fd.append('stylize', 'true');
 
     this.ui.err.textContent = '';
-    this.ui.loadingText.textContent = useAi ? 'Creando ilustración con IA…' : 'Generando tu obra…';
+    this.ui.loadingText.textContent = 'Generando tu obra…';
     this.ui.loading.style.display = 'flex';
+    // El anuncio se reproduce MIENTRAS se genera (free); Plus no ve anuncios.
+    const adPromise = Ads.gate('create');
     try {
       const res = await fetch(base + '/generate', { method: 'POST', body: fd });
       if (!res.ok) {
@@ -272,12 +378,15 @@ const SvgGame = {
         thumb, doc, paintedIds: [], total: doc.regions.length, progress: 0,
       };
       try { await Creations.put(this.creation); } catch (_) { /* cuota */ }
+      Auth.pushCreation(this.creation);
+      await adPromise;               // no abrir el juego con el anuncio a medias
       this.loadDoc(doc, []);
     } catch (e) {
+      await adPromise;
       // error de red (no respondio el server) vs error devuelto por el server
       const isNetwork = (e instanceof TypeError);
       this.ui.err.textContent = isNetwork
-        ? 'No se pudo conectar con el backend. ¿Está uvicorn en marcha y la URL es correcta?'
+        ? 'No hay conexión con el servidor. Inténtalo de nuevo en un momento.'
         : 'No se pudo generar: ' + e.message;
     } finally {
       this.ui.loading.style.display = 'none';
@@ -317,6 +426,7 @@ const SvgGame = {
     });
     this.selectFirstAvailable();
     this.updateProgress();
+    this.updateHintBadge();
   },
 
   buildSvg() {
@@ -550,16 +660,57 @@ const SvgGame = {
   },
 
   // ---------- pista: lleva la camara a una region pendiente y la hace parpadear ----------
+  // Pistas: 3 gratis; sin pistas -> ver un anuncio da 3 más. Plus: ilimitadas.
   async hint() {
     const i = this.state.selectedColor;
     if (i < 0) return;
     const id = (this.regionsByColor[i] || []).find(id => !this.pathEls[id].classList.contains('painted'));
     if (id === undefined) return;
-    await Ads.gate('hint');   // usuarios free: anuncio antes de la pista
+
+    if (!Hints.unlimited()) {
+      if (Hints.count() <= 0) {
+        const watch = await this.offerHintAd();
+        if (!watch) return;
+        await Ads.show('hint');
+        Hints.grant();
+        toast(`+${Hints.PER_AD} pistas 💡`);
+      }
+      Hints.use();
+    }
+
     const el = this.pathEls[id];
     this.centerOn(el);
     el.classList.add('hintpulse');
     setTimeout(() => el.classList.remove('hintpulse'), 2400);
+  },
+
+  // Modal "sin pistas": ver anuncio (true) o cerrar (false).
+  offerHintAd() {
+    return new Promise((resolve) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'paywall';
+      wrap.innerHTML =
+        `<div class="paywall-card" style="text-align:center">
+          <button class="paywall-x" aria-label="Cerrar">✕</button>
+          <h2>Te quedaste sin pistas</h2>
+          <p class="paywall-sub">Mira un anuncio corto y consigue ${Hints.PER_AD} pistas más.</p>
+          <button class="plan-cta" id="hintad-go" style="width:100%">📺 Ver anuncio</button>
+          <p class="paywall-note">¿Sin anuncios y pistas ilimitadas? <a id="hintad-plus" style="color:#764ba2;font-weight:700;cursor:pointer">Hazte Plus</a></p>
+        </div>`;
+      document.body.appendChild(wrap);
+      const done = (v) => { wrap.remove(); resolve(v); };
+      wrap.querySelector('.paywall-x').onclick = () => done(false);
+      wrap.onclick = (e) => { if (e.target === wrap) done(false); };
+      wrap.querySelector('#hintad-go').onclick = () => done(true);
+      wrap.querySelector('#hintad-plus').onclick = () => { done(false); Membership.openPaywall('ads'); };
+    });
+  },
+
+  updateHintBadge() {
+    const b = this.ui.hintBadge;
+    if (!b) return;
+    if (Hints.unlimited()) { b.textContent = '∞'; }
+    else { b.textContent = String(Hints.count()); }
   },
 
   centerOn(el) {
@@ -646,6 +797,7 @@ const SvgGame = {
     this.creation.progress = pct;
     this.creation.updatedAt = Date.now();
     try { await Creations.put(this.creation); } catch (e) { /* cuota llena */ }
+    Auth.pushCreation(this.creation);   // sincroniza con la cuenta (si hay sesión)
   },
 
   resumePainted(ids) {
@@ -722,6 +874,9 @@ const SvgGame = {
       ? Math.round((this.state.paintedCount / this.state.totalRegions) * 100) : 0;
     this.ui.progressBar.style.width = pct + '%';
     this.ui.progressPct.textContent = pct + '%';
+    // el timelapse (🎬) solo aparece con el dibujo terminado
+    const done = this.state.totalRegions > 0 && this.state.paintedCount === this.state.totalRegions;
+    if (this.ui.toolFinale) this.ui.toolFinale.style.display = done ? 'flex' : 'none';
   },
 
   triggerVictory() {
@@ -843,13 +998,12 @@ const SvgGame = {
     // botones
     document.getElementById('back-btn').onclick = () => this.backToGallery();
     document.getElementById('victory-close').onclick = () => { this.ui.victory.style.display = 'none'; this.backToGallery(); };
-    // herramientas (zoom / pista / varita)
+    // herramientas (zoom / centrar / pista)
     const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
     bind('tool-zoom-in', () => this.zoomBy(1.4));
     bind('tool-zoom-out', () => this.zoomBy(0.72));
     bind('tool-fit', () => this.fit());
     bind('tool-hint', () => this.hint());
-    bind('tool-wand', () => this.magicWand());
     bind('tool-finale', () => this.openFinale(this.state.paintedCount === this.state.totalRegions));
   },
 

@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Andy Color · Tu foto → Color by Number</title>
+<title>Andy Color · Convierte tus fotos en pintar por números</title>
+<meta name="description" content="Sube una foto y conviértela en un cuadro de pintar por números. Pinta, relájate y comparte el timelapse de tu obra. Gratis, desde el móvil.">
+<meta property="og:title" content="Andy Color — Tus fotos, hechas pintar por números">
+<meta property="og:description" content="Sube una foto, píntala por números y comparte el timelapse de tu obra.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/icon-512.png">
+<meta name="twitter:card" content="summary">
 
 <!-- PWA -->
 <link rel="manifest" href="/manifest.json">
@@ -33,7 +39,7 @@
   .card-back { position: absolute; top: 16px; left: 16px; width: 36px; height: 36px; border: none; border-radius: 50%; background: #f0f0f4; font-size: 1.1rem; cursor: pointer; }
 
   /* ===== Galería "Mis creaciones" ===== */
-  #gallery-view { flex: 1; display: flex; flex-direction: column; background: linear-gradient(135deg, #667eea, #764ba2); overflow-y: auto; }
+  #gallery-view { flex: 1; display: none; flex-direction: column; background: linear-gradient(135deg, #667eea, #764ba2); overflow-y: auto; }
   .gal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
   .gal-header h1 { color: #fff; font-size: 1.35rem; }
   .gal-actions { display: flex; gap: 8px; align-items: center; }
@@ -231,9 +237,155 @@
   /* ===== Toast ===== */
   .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); z-index: 90; background: #222; color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: .9rem; opacity: 0; transition: .3s; pointer-events: none; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ===== Landing ===== */
+  #landing-view { flex: 1; display: none; flex-direction: column; background: linear-gradient(160deg, #667eea, #764ba2 60%, #5a3d8a); overflow-y: auto; color: #fff; }
+  .land-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; padding-top: calc(14px + env(safe-area-inset-top)); }
+  .land-logo { font-weight: 800; font-size: 1.1rem; }
+  .land-nav button { border: 1.5px solid rgba(255,255,255,.75); background: rgba(255,255,255,.1); color: #fff; border-radius: 999px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
+  .hero { text-align: center; padding: 34px 24px 10px; max-width: 560px; margin: 0 auto; }
+  .hero h1 { font-size: 1.9rem; line-height: 1.2; }
+  .hero p { margin: 14px 0 22px; opacity: .92; line-height: 1.5; }
+  .cta { display: inline-block; border: none; border-radius: 14px; padding: 15px 30px; font-weight: 800; font-size: 1.05rem; background: #fff; color: #764ba2; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+  .cta:active { transform: scale(.97); }
+  .guest-link { display: block; margin-top: 14px; color: rgba(255,255,255,.85); text-decoration: underline; font-size: .85rem; cursor: pointer; }
+  .demo-pair { display: flex; gap: 14px; justify-content: center; margin: 30px auto 6px; max-width: 380px; padding: 0 10px; }
+  .demo-pair > div { flex: 1; aspect-ratio: 1; border-radius: 16px; box-shadow: 0 10px 26px rgba(0,0,0,.32); position: relative; overflow: hidden; }
+  .demo-photo { background:
+    radial-gradient(circle at 72% 26%, #ffd24a 0 16%, transparent 17%),
+    linear-gradient(180deg, #7fb2ef 0 55%, #6aa15e 55%); }
+  .demo-cbn { background: #fff; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
+  .demo-cbn span { display: flex; align-items: center; justify-content: center; font-size: .72rem; color: #999; border: 1px solid #e6e6ee; }
+  .demo-cbn span.f1 { background: #7fb2ef; color: transparent; }
+  .demo-cbn span.f2 { background: #ffd24a; color: transparent; }
+  .demo-cbn span.f3 { background: #6aa15e; color: transparent; }
+  .demo-arrow { align-self: center; font-size: 1.5rem; flex: 0 0 auto; }
+  .feats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; padding: 26px 18px; max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+  .feat { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 14px; }
+  .feat .ic { font-size: 1.5rem; }
+  .feat b { display: block; margin: 6px 0 3px; font-size: .92rem; }
+  .feat small { opacity: .85; font-size: .78rem; line-height: 1.35; display: block; }
+  .how { text-align: center; padding: 8px 18px 6px; }
+  .how h2, .prices h2 { font-size: 1.25rem; margin-bottom: 14px; text-align: center; }
+  .steps { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
+  .step { flex: 1 1 150px; max-width: 200px; background: rgba(255,255,255,.1); border-radius: 14px; padding: 14px; font-size: .85rem; }
+  .step .n { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #764ba2; font-weight: 800; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .prices { padding: 26px 18px 8px; }
+  .price-cards { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; max-width: 560px; margin: 0 auto; }
+  .price { flex: 1 1 180px; max-width: 240px; background: #fff; color: #333; border-radius: 16px; padding: 18px; text-align: center; }
+  .price.hl { outline: 3px solid #ffd24a; }
+  .price .amt { font-size: 1.6rem; font-weight: 800; color: #764ba2; }
+  .price ul { list-style: none; margin: 10px 0 0; padding: 0; font-size: .82rem; color: #555; }
+  .price li { padding: 3px 0; }
+  .land-foot { text-align: center; padding: 30px 18px calc(24px + env(safe-area-inset-bottom)); font-size: .75rem; opacity: .7; }
+  .land-foot a { color: #fff; }
+
+  /* ===== Auth ===== */
+  #auth-view { flex: 1; display: none; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; overflow-y: auto; }
+  .auth-card input { width: 100%; box-sizing: border-box; border: 1.5px solid #ddd; border-radius: 12px; padding: 13px 14px; font-size: 1rem; margin-bottom: 12px; }
+  .auth-card input:focus { outline: none; border-color: #764ba2; }
+  .auth-switch { text-align: center; font-size: .85rem; color: #777; margin-top: 14px; }
+  .auth-switch a { color: #764ba2; font-weight: 700; cursor: pointer; }
+
+  /* ===== Tutorial ===== */
+  #tutorial { position: fixed; inset: 0; z-index: 75; background: rgba(20,12,40,.96); display: none; align-items: center; justify-content: center; padding: 22px; }
+  .tut-card { width: 100%; max-width: 360px; background: #fff; border-radius: 20px; padding: 28px 22px; text-align: center; color: #333; }
+  .tut-emoji { font-size: 3.4rem; }
+  .tut-card h3 { margin: 10px 0 8px; }
+  .tut-card p { color: #777; font-size: .9rem; line-height: 1.5; min-height: 66px; }
+  .tut-dots { display: flex; gap: 6px; justify-content: center; margin: 14px 0; }
+  .tut-dots i { width: 8px; height: 8px; border-radius: 50%; background: #ddd; }
+  .tut-dots i.on { background: #764ba2; }
+  .tut-actions { display: flex; gap: 10px; }
+  .tut-actions .skip { flex: 1; border: none; background: #f0f0f4; color: #888; border-radius: 12px; padding: 12px; font-weight: 700; cursor: pointer; }
+  .tut-actions .next { flex: 2; border: none; background: #764ba2; color: #fff; border-radius: 12px; padding: 12px; font-weight: 700; cursor: pointer; }
+
+  /* ===== badge de pistas ===== */
+  #tool-hint { position: relative; }
+  #tool-hint .hbadge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: #d63384; color: #fff; font-size: .62rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+
+  /* ===== mobile-first: safe areas + toques ===== */
+  button { touch-action: manipulation; }
+  #topbar { padding-top: calc(8px + env(safe-area-inset-top)); }
+  .paleta-container { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .gal-header { padding-top: calc(18px + env(safe-area-inset-top)); }
 </style>
 </head>
 <body>
+
+  <!-- ===== Landing (pública) ===== -->
+  <div id="landing-view">
+    <nav class="land-nav">
+      <span class="land-logo">🎨 Andy Color</span>
+      <button id="landing-login">Entrar</button>
+    </nav>
+    <header class="hero">
+      <h1>Tus fotos, hechas pintar por números</h1>
+      <p>Sube cualquier foto y conviértela en un cuadro numerado. Pinta tocando, relájate y comparte el timelapse de tu obra.</p>
+      <button class="cta" id="landing-cta">Empezar gratis</button>
+      <a class="guest-link" id="landing-guest">Probar sin cuenta (solo en este dispositivo)</a>
+      <div class="demo-pair">
+        <div class="demo-photo"></div>
+        <span class="demo-arrow">➜</span>
+        <div class="demo-cbn">
+          <span class="f1">1</span><span class="f1">1</span><span>1</span><span class="f2">2</span>
+          <span>1</span><span class="f1">1</span><span>1</span><span>2</span>
+          <span class="f3">3</span><span>3</span><span class="f1">1</span><span>1</span>
+          <span class="f3">3</span><span class="f3">3</span><span>3</span><span>3</span>
+        </div>
+      </div>
+    </header>
+    <section class="feats">
+      <div class="feat"><span class="ic">📷</span><b>Tus propias fotos</b><small>Cada cuadro es único: tu familia, tu mascota, tu viaje.</small></div>
+      <div class="feat"><span class="ic">🧘</span><b>Pinta y relájate</b><small>Toca las zonas con el número del color. Sin complicaciones.</small></div>
+      <div class="feat"><span class="ic">🎬</span><b>Timelapse final</b><small>Mira tu obra pintarse sola y compártela en un toque.</small></div>
+      <div class="feat"><span class="ic">📱</span><b>En tu móvil</b><small>Instálala como app y sigue donde lo dejaste.</small></div>
+    </section>
+    <section class="how">
+      <h2>Cómo funciona</h2>
+      <div class="steps">
+        <div class="step"><span class="n">1</span><br>Sube una foto desde tu galería o cámara.</div>
+        <div class="step"><span class="n">2</span><br>Pinta por números: un color cada vez.</div>
+        <div class="step"><span class="n">3</span><br>Descarga tu obra o comparte el timelapse.</div>
+      </div>
+    </section>
+    <section class="prices">
+      <h2>Precios</h2>
+      <div class="price-cards">
+        <div class="price"><b>Gratis</b><div class="amt">€0</div><ul><li>Crea y pinta sin límite</li><li>Con anuncios</li></ul></div>
+        <div class="price hl"><b>Plus</b><div class="amt">€5</div><ul><li>Sin anuncios</li><li>Pago único</li></ul></div>
+      </div>
+    </section>
+    <footer class="land-foot">© 2026 Andy Color · <a href="#">Privacidad</a> · <a href="#">Términos</a></footer>
+  </div>
+
+  <!-- ===== Login / registro ===== -->
+  <div id="auth-view">
+    <div class="card auth-card">
+      <button class="card-back" id="auth-back" aria-label="Volver">←</button>
+      <h1 id="auth-title">Crear cuenta</h1>
+      <p class="sub" id="auth-sub">Tu progreso se guarda en tu cuenta: recupéralo en cualquier dispositivo.</p>
+      <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+      <input type="password" id="auth-pass" placeholder="Contraseña (mín. 6)" autocomplete="current-password">
+      <button class="btn" id="auth-submit">Crear cuenta</button>
+      <div class="err" id="auth-err"></div>
+      <p class="auth-switch" id="auth-switch">¿Ya tienes cuenta? <a id="auth-toggle">Entrar</a></p>
+    </div>
+  </div>
+
+  <!-- ===== Tutorial (primera vez) ===== -->
+  <div id="tutorial">
+    <div class="tut-card">
+      <div class="tut-emoji" id="tut-emoji">📷</div>
+      <h3 id="tut-title"></h3>
+      <p id="tut-text"></p>
+      <div class="tut-dots" id="tut-dots"></div>
+      <div class="tut-actions">
+        <button class="skip" id="tut-skip">Saltar</button>
+        <button class="next" id="tut-next">Siguiente</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== Galería "Mis creaciones" (home) ===== -->
   <div id="gallery-view">
@@ -242,6 +394,7 @@
       <div class="gal-actions">
         <button class="plan-chip" id="plan-chip" title="Tu plan">Gratis</button>
         <button class="btn-install" id="btn-install" hidden>⬇️ Instalar</button>
+        <button class="btn-install" id="btn-account">Salir</button>
         <button class="btn-new" id="btn-new">+ Nueva</button>
       </div>
     </div>
@@ -256,8 +409,8 @@
   <div id="upload-view">
     <div class="card">
       <button class="card-back" id="upload-back" aria-label="Volver">←</button>
-      <h1>🎨 Tu foto → Color by Number</h1>
-      <p class="sub">Sube una foto y genera un mandala numerado vectorial con zoom infinito.</p>
+      <h1>🎨 Nueva creación</h1>
+      <p class="sub">Sube una foto y la convertimos en un cuadro de pintar por números.</p>
 
       <img id="preview-thumb" alt="vista previa">
       <div class="drop" id="drop">
@@ -304,12 +457,11 @@
         </div>
       </div>
       <div id="tools">
-        <button id="tool-hint" title="Pista">💡</button>
-        <button id="tool-wand" class="accent" title="Varita mágica (pinta todo el color)">✨</button>
+        <button id="tool-hint" title="Pista"><span>💡</span><span class="hbadge" id="hint-badge">3</span></button>
         <button id="tool-zoom-in" title="Acercar">+</button>
         <button id="tool-zoom-out" title="Alejar">−</button>
-        <button id="tool-fit" title="Ajustar a pantalla">⊡</button>
-        <button id="tool-finale" title="Ver timelapse / compartir">🎬</button>
+        <button id="tool-fit" title="Centrar imagen">⌖</button>
+        <button id="tool-finale" title="Ver timelapse / compartir" style="display:none">🎬</button>
       </div>
     </div>
     <div class="paleta-container">
@@ -355,6 +507,7 @@
     window.addEventListener('appinstalled', () => { if (installBtn) installBtn.hidden = true; });
   </script>
 
+  <script src="js/auth.js"></script>
   <script src="js/membership.js"></script>
   <script src="js/ads.js"></script>
   <script src="js/creations.js"></script>

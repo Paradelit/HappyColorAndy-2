@@ -1,26 +1,25 @@
 // ==========================================
-// 💳 MEMBERSHIP.JS — Planes, límites y paywall (capa local)
+// 💳 MEMBERSHIP.JS — Plan, paywall y economía de pistas
 // ==========================================
-// Estado de membresía LOCAL (localStorage) para poder construir y probar todo
-// el gating sin backend. Cuando haya Stripe + cuentas, este estado se sustituye
-// por el que devuelva el servidor (ver startCheckout más abajo).
+// MVP v1: dos planes. Free = con anuncios; Plus (€5, pago único) = sin anuncios
+// (y pistas ilimitadas, porque las pistas extra se ganan viendo anuncios).
+// El modo IA de pago llegará más adelante.
 //
-//  >>> AJUSTA AQUÍ precios y límites de cada plan <<<
+// Si hay sesión, el plan y las pistas viven en la cuenta (servidor); sin sesión,
+// en localStorage. startCheckout() es el punto de integración de Stripe: hoy
+// simula la compra para poder probar la app entera.
+//
+//  >>> AJUSTA AQUÍ precios y textos <<<
 const PLANS = {
   free: {
     id: 'free', name: 'Gratis', price: '€0',
-    ai: false, ads: true, limit: 5,
-    perks: ['Crear con anuncios', 'Pista con anuncio', 'Hasta 5 creaciones'],
+    ads: true,
+    perks: ['Crea y pinta sin límite', 'Anuncios al crear y en pistas extra'],
   },
   plus: {
-    id: 'plus', name: 'Plus', price: '€5/mes',
-    ai: true, ads: false, limit: 50,
-    perks: ['Sin anuncios', 'Modo IA (mejores dibujos)', 'Hasta 50 creaciones'],
-  },
-  pro: {
-    id: 'pro', name: 'Pro', price: '€20/mes',
-    ai: true, ads: false, limit: Infinity,
-    perks: ['Sin anuncios', 'Modo IA (mejores dibujos)', 'Creaciones ilimitadas'],
+    id: 'plus', name: 'Plus', price: '€5 · pago único',
+    ads: false,
+    perks: ['Sin anuncios', 'Pistas ilimitadas', 'Apoyas el desarrollo 💜'],
   },
 };
 
@@ -29,27 +28,30 @@ const Membership = {
   plans: PLANS,
 
   tier() {
+    if (typeof Auth !== 'undefined' && Auth.isLogged()) {
+      return PLANS[Auth.user.plan] ? Auth.user.plan : 'free';
+    }
     const t = localStorage.getItem(this._KEY);
     return PLANS[t] ? t : 'free';
   },
   plan() { return PLANS[this.tier()]; },
   setTier(t) {
     if (!PLANS[t]) return;
+    if (typeof Auth !== 'undefined' && Auth.isLogged()) {
+      Auth.user.plan = t;
+      Auth.saveFlags({ plan: t });
+    }
     localStorage.setItem(this._KEY, t);
     document.dispatchEvent(new CustomEvent('plan-changed'));
   },
   isMember() { return this.tier() !== 'free'; },
-  hasAI() { return this.plan().ai; },
   adsEnabled() { return this.plan().ads; },
-  creationLimit() { return this.plan().limit; },
 
-  // -------- Paywall (pantalla de planes) --------
-  // context: 'ai' | 'limit' | 'manual' -> personaliza el subtítulo.
+  // -------- Paywall --------
   openPaywall(context = 'manual') {
     const sub = {
-      ai: 'El modo IA (dibujos más limpios) está en Plus y Pro.',
-      limit: 'Has alcanzado el límite de creaciones de tu plan.',
-      manual: 'Mejora tu plan para quitar anuncios y desbloquear la IA.',
+      ads: 'Quita los anuncios para siempre y pinta sin interrupciones.',
+      manual: 'Mejora a Plus para quitar los anuncios.',
     }[context] || '';
 
     const wrap = document.createElement('div');
@@ -57,12 +59,12 @@ const Membership = {
     wrap.innerHTML =
       `<div class="paywall-card">
         <button class="paywall-x" aria-label="Cerrar">✕</button>
-        <h2>Mejora tu plan</h2>
+        <h2>Hazte Plus</h2>
         <p class="paywall-sub">${sub}</p>
         <div class="plans">
-          ${['free', 'plus', 'pro'].map(id => this._planCardHtml(id)).join('')}
+          ${['free', 'plus'].map(id => this._planCardHtml(id)).join('')}
         </div>
-        <p class="paywall-note">Demo: la suscripción se simula localmente. Aquí se conectará Stripe Checkout.</p>
+        <p class="paywall-note">Demo: la compra se simula localmente. Aquí se conectará Stripe Checkout.</p>
       </div>`;
     document.body.appendChild(wrap);
 
@@ -79,7 +81,7 @@ const Membership = {
     const current = this.tier() === id;
     const cta = id === 'free'
       ? (current ? 'Tu plan' : 'Gratis')
-      : (current ? 'Plan actual' : `Elegir ${p.name}`);
+      : (current ? 'Plan actual' : 'Quitar anuncios');
     return `<div class="plan ${id} ${current ? 'current' : ''}">
         <div class="plan-name">${p.name}</div>
         <div class="plan-price">${p.price}</div>
@@ -90,13 +92,44 @@ const Membership = {
 };
 
 // PUNTO DE INTEGRACIÓN STRIPE -----------------------------------------------
-// Hoy: simula la suscripción cambiando el plan local (para probar la app).
-// Mañana: llamar al backend para crear una sesión de Stripe Checkout y redirigir;
-// al volver, el backend confirma el pago (webhook) y la app lee el plan real.
+// Hoy: simula la compra cambiando el plan (para probar la app entera).
+// Mañana: pedir al backend una sesión de Stripe Checkout, redirigir, y al volver
+// el webhook confirma el pago y fija plan=plus en la cuenta del usuario.
 function startCheckout(tier) {
   Membership.setTier(tier);
   toast(`✓ Plan ${PLANS[tier].name} activado (demo)`);
 }
+
+// ==========================================
+// 💡 HINTS — 3 pistas gratis; más viendo un anuncio (+3). Plus: ilimitadas.
+// ==========================================
+const Hints = {
+  _KEY: 'andycolor_hints',
+  START: 3,
+  PER_AD: 3,
+
+  unlimited() { return Membership.isMember(); },
+
+  count() {
+    if (typeof Auth !== 'undefined' && Auth.isLogged()) return Auth.user.hints ?? 0;
+    const v = localStorage.getItem(this._KEY);
+    return v === null ? this.START : Math.max(0, parseInt(v, 10) || 0);
+  },
+
+  set(n) {
+    n = Math.max(0, n);
+    if (typeof Auth !== 'undefined' && Auth.isLogged()) {
+      Auth.user.hints = n;
+      Auth.saveFlags({ hints: n });
+    } else {
+      localStorage.setItem(this._KEY, String(n));
+    }
+    document.dispatchEvent(new CustomEvent('hints-changed'));
+  },
+
+  use() { this.set(this.count() - 1); },
+  grant() { this.set(this.count() + this.PER_AD); },
+};
 
 // Mini toast reutilizable.
 function toast(msg) {

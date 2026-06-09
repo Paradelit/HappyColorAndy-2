@@ -11,9 +11,18 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
-      - key: STYLIZE_API_KEY      # clave Gemini (Google AI Studio). Secreto.
+      - key: SECRET_KEY           # firma de los tokens de sesión (login)
+        generateValue: true
+      - key: STYLIZE_API_KEY      # clave Gemini (IA, aún sin usar en v1). Secreto.
         sync: false               # se introduce en el panel, no en el repo
       - key: STYLIZE_PROVIDER
         value: gemini
       - key: CORS_ORIGINS         # mismo origen -> no hace falta; "*" por si acaso
         value: "*"
+    # PERSISTENCIA: las cuentas y el progreso (SQLite) viven en DATA_DIR. Sin un
+    # disco, se BORRAN en cada deploy. Para producción añade un disco (plan de
+    # pago) y descomenta:
+    # disk:
+    #   name: data
+    #   mountPath: /app/backend/data
+    #   sizeGB: 1

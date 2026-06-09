@@ -43,12 +43,19 @@ Para uso real, sube el plan a `standard` (2 GB) en `render.yaml` o desde el pane
 
 | Variable           | Por defecto | Para qué |
 |--------------------|-------------|----------|
-| `STYLIZE_API_KEY`  | (vacío)     | Activa el modo IA. Clave de Gemini/OpenAI. |
+| `SECRET_KEY`       | (autogenerada) | Firma de los tokens de sesión (login). Fija una para que las sesiones sobrevivan a los deploys. |
+| `DATA_DIR`         | `backend/data` | Carpeta de la BD (cuentas + progreso, SQLite). **Móntala en un disco persistente en producción.** |
+| `STYLIZE_API_KEY`  | (vacío)     | Activa el modo IA (v2). Clave de Gemini/OpenAI. |
 | `STYLIZE_PROVIDER` | `gemini`    | `gemini` (gratis) u `openai` (de pago). |
 | `STYLIZE_MODEL`    | (auto)      | Forzar un modelo concreto (opcional). |
 | `CORS_ORIGINS`     | `*`         | Orígenes permitidos si el frontend se hospeda aparte. |
 | `PORT`             | `8000`      | Lo inyecta la plataforma; no lo toques. |
 | `FRONTEND_DIR`     | `/app`      | Dónde está `upload.html` (ya configurado en el Dockerfile). |
+
+> ⚠️ **Cuentas y progreso:** el login guarda usuarios y creaciones en SQLite
+> dentro de `DATA_DIR`. En hosting sin disco persistente (Render free) esos
+> datos se pierden con cada deploy/reinicio: para publicar de verdad, añade un
+> disco (Render Starter) o mueve la BD a un servicio gestionado.
 
 ---
 

@@ -4,6 +4,7 @@
 .gitignore
 **/__pycache__
 **/*.pyc
+backend/data
 
 # media pesada (musica, imagenes de referencia, icono enorme)
 *.mp3

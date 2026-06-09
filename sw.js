@@ -1,7 +1,7 @@
 // Service worker de Andy Color (PWA). Cachea el "app shell" para que arranque
 // offline y al instante; las llamadas al API (/generate, /capabilities…) siempre
 // van a la red.
-const CACHE = 'andycolor-v2';
+const CACHE = 'andycolor-v3';
 const SHELL = [
   '/',
   '/js/svg-game.js',
@@ -9,6 +9,7 @@ const SHELL = [
   '/js/finale.js',
   '/js/membership.js',
   '/js/ads.js',
+  '/js/auth.js',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -36,8 +37,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;                       // POST /generate -> red
   const url = new URL(req.url);
-  // El API siempre a la red (nunca cacheado).
-  if (url.origin === location.origin && /^\/(generate|capabilities|health|preview)\b/.test(url.pathname)) {
+  // El API (generación, cuentas, sync) siempre a la red (nunca cacheado).
+  if (url.origin === location.origin && /^\/(generate|capabilities|health|preview|auth|sync|user)\b/.test(url.pathname)) {
     return;
   }
   // App shell: cache-first con refresco en segundo plano.
