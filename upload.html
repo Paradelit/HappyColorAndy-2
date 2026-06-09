@@ -309,6 +309,26 @@
   #topbar { padding-top: calc(8px + env(safe-area-inset-top)); }
   .paleta-container { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .gal-header { padding-top: calc(18px + env(safe-area-inset-top)); }
+
+  /* ===== Consentimiento (CMP) ===== */
+  .consent-banner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 95; background: #14141c; color: #eee; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 30px rgba(0,0,0,.4); }
+  .consent-inner { max-width: 720px; margin: 0 auto; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .consent-text { flex: 1 1 260px; font-size: .82rem; line-height: 1.45; }
+  .consent-text a { color: #c9b6f5; }
+  .consent-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .consent-btns button { border: none; border-radius: 10px; padding: 10px 14px; font-weight: 700; font-size: .85rem; cursor: pointer; }
+  .c-ghost { background: #2a2a36; color: #ddd; }
+  .c-primary { background: #d63384; color: #fff; }
+  .consent-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #eee; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .consent-row span { display: flex; flex-direction: column; }
+  .consent-row small { color: #999; font-size: .76rem; }
+  .consent-row input { width: 20px; height: 20px; accent-color: #764ba2; flex: 0 0 auto; }
+
+  /* ===== Modal de cuenta ===== */
+  .acct-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .acct-item { text-align: left; border: 1px solid #ececf2; background: #fafafd; border-radius: 12px; padding: 13px 14px; font-weight: 600; font-size: .92rem; color: #333; cursor: pointer; }
+  .acct-item:active { transform: scale(.99); }
+  .acct-item.danger { color: #c0392b; border-color: #f3c9c3; background: #fdf3f1; }
 </style>
 </head>
 <body>
@@ -356,7 +376,7 @@
         <div class="price hl"><b>Plus</b><div class="amt">€5</div><ul><li>Sin anuncios</li><li>Pago único</li></ul></div>
       </div>
     </section>
-    <footer class="land-foot">© 2026 Andy Color · <a href="#">Privacidad</a> · <a href="#">Términos</a></footer>
+    <footer class="land-foot">© 2026 Andy Color · <a href="/privacy" target="_blank">Privacidad</a> · <a href="/terms" target="_blank">Términos</a> · <a id="land-cookies">Cookies</a></footer>
   </div>
 
   <!-- ===== Login / registro ===== -->
@@ -509,6 +529,7 @@
 
   <script src="js/auth.js"></script>
   <script src="js/membership.js"></script>
+  <script src="js/consent.js"></script>
   <script src="js/ads.js"></script>
   <script src="js/creations.js"></script>
   <script src="js/finale.js"></script>

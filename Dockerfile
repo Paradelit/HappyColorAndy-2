@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Codigo del backend + frontend (el .dockerignore deja fuera la app antigua y la media).
 COPY backend/ ./backend/
-COPY upload.html ./upload.html
+COPY upload.html privacy.html terms.html ./
 COPY js/ ./js/
 # Ficheros PWA (instalable + offline)
 COPY manifest.json sw.js icon-192.png icon-512.png ./

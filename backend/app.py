@@ -153,6 +153,22 @@ def index():
     return {"status": "ok", "note": "frontend no encontrado; usa el API en /generate"}
 
 
+@app.get("/privacy")
+def privacy():
+    f = FRONTEND_DIR / "privacy.html"
+    if f.exists():
+        return FileResponse(f)
+    raise HTTPException(status_code=404, detail="No encontrado")
+
+
+@app.get("/terms")
+def terms():
+    f = FRONTEND_DIR / "terms.html"
+    if f.exists():
+        return FileResponse(f)
+    raise HTTPException(status_code=404, detail="No encontrado")
+
+
 # Sirve los modulos JS de la app.
 if (FRONTEND_DIR / "js").is_dir():
     app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")

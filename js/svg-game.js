@@ -109,7 +109,7 @@ const SvgGame = {
     this.ui.planChip = document.getElementById('plan-chip');
     this.ui.planChip.onclick = () => Membership.openPaywall('manual');
     this.ui.accountBtn = document.getElementById('btn-account');
-    this.ui.accountBtn.onclick = () => this.onAccountClick();
+    this.ui.accountBtn.onclick = () => this.openAccount();
     this.updatePlanChip();
     document.addEventListener('plan-changed', () => {
       this.updatePlanChip();
@@ -118,18 +118,65 @@ const SvgGame = {
     document.addEventListener('hints-changed', () => this.updateHintBadge());
   },
 
-  // "Salir" con sesión; "Entrar" como invitado.
-  onAccountClick() {
-    if (Auth.isLogged()) {
-      Auth.logout();
-      this.showLanding();
-    } else {
-      this.showAuth('login');
-    }
+  updateAccountBtn() {
+    this.ui.accountBtn.textContent = Auth.isLogged() ? '⚙️ Cuenta' : '⚙️';
   },
 
-  updateAccountBtn() {
-    this.ui.accountBtn.textContent = Auth.isLogged() ? 'Salir' : 'Entrar';
+  // Modal de cuenta: sesión/legal/cookies + derechos RGPD (exportar / borrar).
+  openAccount() {
+    const logged = Auth.isLogged();
+    const email = logged ? Auth.user.email : null;
+    const plan = Membership.plan().name;
+    const wrap = document.createElement('div');
+    wrap.className = 'paywall';
+    wrap.innerHTML =
+      `<div class="paywall-card">
+        <button class="paywall-x" aria-label="Cerrar">✕</button>
+        <h2>Cuenta</h2>
+        <p class="paywall-sub">${logged ? email + ' · Plan ' + plan : 'Estás como invitado (solo este dispositivo). Plan ' + plan + '.'}</p>
+        <div class="acct-list">
+          ${logged ? '' : '<button class="acct-item" data-act="login">🔑 Entrar o crear cuenta</button>'}
+          ${Membership.isMember() ? '' : '<button class="acct-item" data-act="plus">✨ Hazte Plus (sin anuncios)</button>'}
+          <button class="acct-item" data-act="cookies">🍪 Privacidad y cookies</button>
+          <button class="acct-item" data-act="privacy">📄 Política de privacidad</button>
+          <button class="acct-item" data-act="terms">📄 Términos y condiciones</button>
+          ${logged ? '<button class="acct-item" data-act="export">⬇️ Descargar mis datos</button>' : ''}
+          ${logged ? '<button class="acct-item" data-act="logout">🚪 Cerrar sesión</button>' : ''}
+          ${logged ? '<button class="acct-item danger" data-act="delete">🗑️ Borrar mi cuenta</button>' : ''}
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.querySelector('.paywall-x').onclick = close;
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+    wrap.querySelectorAll('[data-act]').forEach(b => {
+      b.onclick = () => this.accountAction(b.getAttribute('data-act'), close);
+    });
+  },
+
+  async accountAction(act, close) {
+    if (act === 'login') { close(); this.showAuth('login'); }
+    else if (act === 'plus') { close(); Membership.openPaywall('ads'); }
+    else if (act === 'cookies') { close(); Consent.openPreferences(); }
+    else if (act === 'privacy') { window.open('/privacy', '_blank'); }
+    else if (act === 'terms') { window.open('/terms', '_blank'); }
+    else if (act === 'logout') { close(); Auth.logout(); this.showLanding(); }
+    else if (act === 'export') {
+      try {
+        const data = await Auth.api('/user/export');
+        downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'mis-datos-andycolor.json');
+      } catch (e) { toast('No se pudieron descargar los datos'); }
+    }
+    else if (act === 'delete') {
+      if (!confirm('¿Seguro que quieres BORRAR tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return;
+      try {
+        await Auth.api('/user/account', { method: 'DELETE' });
+        Auth.logout();
+        close();
+        toast('Cuenta borrada');
+        this.showLanding();
+      } catch (e) { toast('No se pudo borrar la cuenta'); }
+    }
   },
 
   updatePlanChip() {
@@ -165,6 +212,7 @@ const SvgGame = {
       Auth.setGuest(true);
       this.enterApp();
     };
+    document.getElementById('land-cookies').onclick = () => Consent.openPreferences();
   },
 
   showAuth(mode) {

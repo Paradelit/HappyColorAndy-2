@@ -187,6 +187,32 @@ def set_flags(body: Flags, authorization: str = Header(default="")):
     return {"user": _user_payload(row)}
 
 
+@router.get("/user/export")
+def export_data(authorization: str = Header(default="")):
+    """Derecho RGPD de portabilidad: descarga todos los datos del usuario."""
+    uid = _uid(authorization)
+    with _db() as con:
+        u = con.execute("SELECT email, plan, hints, tutorial_done, created_at FROM users WHERE id=?", (uid,)).fetchone()
+        cs = con.execute("SELECT id, updated_at, progress FROM creations WHERE user_id=?", (uid,)).fetchall()
+    if u is None:
+        raise HTTPException(status_code=401, detail="Cuenta no encontrada.")
+    return {
+        "account": {"email": u["email"], "plan": u["plan"], "hints": u["hints"],
+                    "tutorialDone": bool(u["tutorial_done"]), "createdAt": u["created_at"]},
+        "creations": [{"id": c["id"], "updatedAt": c["updated_at"], "progress": c["progress"]} for c in cs],
+    }
+
+
+@router.delete("/user/account")
+def delete_account(authorization: str = Header(default="")):
+    """Derecho RGPD de supresión: borra la cuenta y TODOS sus datos."""
+    uid = _uid(authorization)
+    with _db() as con:
+        con.execute("DELETE FROM creations WHERE user_id=?", (uid,))
+        con.execute("DELETE FROM users WHERE id=?", (uid,))
+    return {"ok": True}
+
+
 # ----------------------------------------------------------------- sync -----
 
 class CreationIn(BaseModel):
