@@ -38,6 +38,17 @@
       radial-gradient(720px 520px at -12% 16%, rgba(255,77,157,.24), transparent 55%),
       #140d2b; }
 
+  /* Accesibilidad: foco visible para teclado en TODOS los controles. */
+  :focus-visible { outline: 3px solid #7c4dff; outline-offset: 2px; }
+  .icon-btn:focus-visible, #tools button:focus-visible, .nav-cta:focus-visible,
+  .lp-btn:focus-visible, .paywall-x:focus-visible { outline-color: #fff; }
+  /* Enlace con aspecto de texto pero accesible por teclado (es un <button>). */
+  .linkbtn { background: none; border: none; padding: 0; margin: 0; font: inherit;
+    color: inherit; cursor: pointer; text-decoration: underline; }
+  /* sólo para lectores de pantalla */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
   /* ---------- Vista de subida ---------- */
   #upload-view {
     flex: 1; display: none; align-items: center; justify-content: center;
@@ -66,13 +77,13 @@
   .gal-card .meta { padding: 8px 10px; }
   .gal-card .bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
   .gal-card .bar > div { height: 100%; background: #d63384; }
-  .gal-card .pct { font-size: .72rem; color: #888; margin-top: 4px; display: flex; justify-content: space-between; }
+  .gal-card .pct { font-size: .72rem; color: #6a6a72; margin-top: 4px; display: flex; justify-content: space-between; }
   .gal-card .done { color: #4CAF50; font-weight: 700; }
   .gal-card .del { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: .9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .gal-empty { color: #fff; text-align: center; margin: auto; opacity: .85; line-height: 1.6; font-size: .92rem; }
   .gal-empty .empty-ic { width: 56px; height: 56px; opacity: .5; margin-bottom: 12px; }
   .card h1 { font-size: 1.4rem; color: #333; margin-bottom: 4px; }
-  .card p.sub { color: #888; font-size: .85rem; margin-bottom: 20px; }
+  .card p.sub { color: #6a6a72; font-size: .85rem; margin-bottom: 20px; }
   .drop {
     border: 2px dashed #c9c9d6; border-radius: 14px; padding: 28px 16px; text-align: center;
     cursor: pointer; transition: .2s; color: #777; margin-bottom: 18px;
@@ -220,7 +231,7 @@
   .paywall-card { background: #fff; border-radius: 20px; padding: 22px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; position: relative; }
   .paywall-x { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border: none; border-radius: 50%; background: #f0f0f4; cursor: pointer; }
   .paywall-card h2 { color: #333; font-size: 1.35rem; }
-  .paywall-sub { color: #888; font-size: .85rem; margin: 6px 0 16px; }
+  .paywall-sub { color: #6a6a72; font-size: .85rem; margin: 6px 0 16px; }
   .plans { display: grid; gap: 12px; }
   .plan { border: 2px solid #eee; border-radius: 14px; padding: 14px; }
   .plan.plus { border-color: #b9a6f0; }
@@ -234,7 +245,7 @@
   .plan-cta { width: 100%; border: none; border-radius: 10px; padding: 11px; font-weight: 700; background: #764ba2; color: #fff; cursor: pointer; }
   .plan.pro .plan-cta { background: #d63384; }
   .plan-cta:disabled { background: #e6e6ec; color: #999; cursor: default; }
-  .paywall-note { text-align: center; color: #aaa; font-size: .72rem; margin-top: 14px; }
+  .paywall-note { text-align: center; color: #6e6e78; font-size: .72rem; margin-top: 14px; }
   .modal-input { width: 100%; box-sizing: border-box; border: 1.5px solid #ddd; border-radius: 12px; padding: 13px 14px; font-size: 1rem; margin-bottom: 12px; font-family: inherit; }
   .modal-input:focus { outline: none; border-color: #764ba2; }
 
@@ -296,7 +307,7 @@
   .lp-btn:hover { transform: translateY(-2px); box-shadow: 0 18px 46px rgba(255,77,157,.5); }
   .lp-btn:active { transform: scale(.97); }
   .lp-ghostlink { color: rgba(255,255,255,.8); text-decoration: underline; font-size: .9rem; cursor: pointer; background: none; border: none; font-family: inherit; }
-  .lp-trust { margin-top: 16px; font-size: .8rem; color: rgba(255,255,255,.55); display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .lp-trust { margin-top: 16px; font-size: .8rem; color: rgba(255,255,255,.7); display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
   .lp-trust span { display: inline-flex; align-items: center; gap: 5px; }
 
   /* phone mockup con demo que se pinta sola */
@@ -351,7 +362,7 @@
     border: 1px solid rgba(255,255,255,.12); border-radius: 26px; padding: 38px 22px; margin: 10px 0; }
   .lp-cta-band h2 { font-size: clamp(1.5rem,6vw,2.2rem); font-weight: 800; letter-spacing: -.5px; }
   .lp-cta-band p { color: rgba(255,255,255,.75); margin: 10px 0 22px; }
-  .lp-foot { text-align: center; padding: 28px 20px calc(26px + env(safe-area-inset-bottom)); font-size: .8rem; color: rgba(255,255,255,.55); border-top: 1px solid rgba(255,255,255,.08); }
+  .lp-foot { text-align: center; padding: 28px 20px calc(26px + env(safe-area-inset-bottom)); font-size: .8rem; color: rgba(255,255,255,.72); border-top: 1px solid rgba(255,255,255,.08); }
   .lp-foot a { color: rgba(255,255,255,.8); cursor: pointer; }
   .lp-foot .brand { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; color: #fff; margin-bottom: 10px; }
   .lp-foot .brand svg { width: 22px; height: 22px; }
@@ -368,8 +379,8 @@
   .btn-google:active { transform: scale(.98); }
   .auth-or { display: flex; align-items: center; gap: 10px; color: #aaa; font-size: .8rem; margin: 14px 0; }
   .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: #e6e6ee; }
-  .auth-switch { text-align: center; font-size: .85rem; color: #777; margin-top: 14px; }
-  .auth-switch a { color: #764ba2; font-weight: 700; cursor: pointer; }
+  .auth-switch { text-align: center; font-size: .85rem; color: #5f5f68; margin-top: 14px; }
+  .auth-switch a, .auth-switch .linkbtn { color: #764ba2; font-weight: 700; cursor: pointer; }
 
   /* ===== Tutorial ===== */
   #tutorial { position: fixed; inset: 0; z-index: 75; background: rgba(20,12,40,.96); display: none; align-items: center; justify-content: center; padding: 22px; }
@@ -415,7 +426,7 @@
   .acct-avatar svg { width: 22px; height: 22px; }
   .acct-who { min-width: 0; }
   .acct-who b { display: block; color: #222; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .acct-who small { color: #9898a4; font-size: .78rem; }
+  .acct-who small { color: #6b6b78; font-size: .78rem; }
   .acct-sec { font-size: .66rem; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: #ababb8; margin: 18px 2px 8px; }
   .acct-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: none; background: #f6f6f9; border-radius: 13px; padding: 13px 14px; margin-bottom: 7px; font-family: inherit; font-weight: 600; font-size: .9rem; color: #2e2e36; cursor: pointer; }
   .acct-row:active { transform: scale(.99); }
@@ -518,7 +529,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="url(#cmHeart)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
         Color Memories
       </div>
-      © 2026 · <a href="/privacy" target="_blank">Privacidad</a> · <a href="/terms" target="_blank">Términos</a> · <a id="land-cookies">Cookies</a>
+      © 2026 · <a href="/privacy" target="_blank">Privacidad</a> · <a href="/terms" target="_blank">Términos</a> · <button type="button" class="linkbtn" id="land-cookies">Cookies</button>
     </footer>
   </div>
 
@@ -535,17 +546,17 @@
         </button>
         <div class="auth-or"><span>o</span></div>
       </div>
-      <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
-      <input type="password" id="auth-pass" placeholder="Contraseña (mín. 6)" autocomplete="current-password">
+      <input type="email" id="auth-email" placeholder="Email" aria-label="Email" autocomplete="email">
+      <input type="password" id="auth-pass" placeholder="Contraseña (mín. 6)" aria-label="Contraseña" autocomplete="current-password">
       <button class="btn" id="auth-submit">Crear cuenta</button>
       <div class="err" id="auth-err"></div>
-      <p class="auth-switch" id="auth-forgot" hidden><a id="auth-forgot-link">¿Olvidaste tu contraseña?</a></p>
+      <p class="auth-switch" id="auth-forgot" hidden><button type="button" class="linkbtn" id="auth-forgot-link">¿Olvidaste tu contraseña?</button></p>
       <p class="auth-switch" id="auth-switch">¿Ya tienes cuenta? <a id="auth-toggle">Entrar</a></p>
     </div>
   </div>
 
   <!-- ===== Tutorial (primera vez) ===== -->
-  <div id="tutorial">
+  <div id="tutorial" role="dialog" aria-modal="true" aria-label="Tutorial">
     <div class="tut-card">
       <div class="tut-emoji" id="tut-emoji">📷</div>
       <h3 id="tut-title"></h3>
@@ -619,7 +630,7 @@
   <!-- ===== Vista de juego ===== -->
   <div id="game-view">
     <div id="topbar">
-      <button id="back-btn">←</button>
+      <button id="back-btn" aria-label="Volver a Mis creaciones">←</button>
       <div id="progress-wrap"><div id="progress-bar"></div></div>
       <div id="progress-pct">0%</div>
     </div>
@@ -631,10 +642,10 @@
       </div>
       <div id="tools">
         <button id="tool-hint" title="Pista"><span>💡</span><span class="hbadge" id="hint-badge">3</span></button>
-        <button id="tool-zoom-in" title="Acercar">+</button>
-        <button id="tool-zoom-out" title="Alejar">−</button>
+        <button id="tool-zoom-in" title="Acercar" aria-label="Acercar">+</button>
+        <button id="tool-zoom-out" title="Alejar" aria-label="Alejar">−</button>
         <button id="tool-fit" title="Centrar imagen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#8a3d7a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></button>
-        <button id="tool-finale" title="Ver timelapse / compartir" style="display:none">🎬</button>
+        <button id="tool-finale" title="Ver timelapse / compartir" style="display:none" aria-label="Ver timelapse">🎬</button>
       </div>
     </div>
     <div class="paleta-container">
@@ -644,7 +655,7 @@
 
   <div id="loading-overlay"><div class="spinner"></div><p id="loading-text">Generando tu obra…</p></div>
 
-  <div id="victory">
+  <div id="victory" role="dialog" aria-modal="true" aria-label="Obra completada">
     <div class="finale-card">
       <h2 id="finale-title">🎉 ¡Completado!</h2>
       <div class="finale-stage"><canvas id="finale-canvas"></canvas></div>

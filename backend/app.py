@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -28,7 +28,7 @@ from pipeline.preprocess import preprocess
 from pipeline.quantize import quantize
 from pipeline.segment import segment
 from pipeline.stylize import stylize_available
-from accounts import router as accounts_router
+from accounts import router as accounts_router, _rate_limit, _client_ip
 
 app = FastAPI(title="HappyColor Foto -> SVG", version="1.0")
 app.include_router(accounts_router)
@@ -90,12 +90,27 @@ def _require_auth(authorization: str) -> None:
     raise HTTPException(status_code=401, detail="Inicia sesión para crear cuadros.")
 
 
+MAX_PIXELS = 40_000_000  # ~40 MP: evita "decompression bombs" (DoS por OOM)
+
+
 async def _read_image(file: UploadFile) -> bytes:
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Archivo vacio.")
     if len(data) > MAX_BYTES:
         raise HTTPException(status_code=413, detail="Imagen demasiado grande (max 25MB).")
+    # Comprueba las dimensiones SIN decodificar los pixeles (Image.open es perezoso):
+    # una imagen de pocos MB puede tener cientos de megapixeles y tumbar el servidor.
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            w, h = im.size
+            fmt = (im.format or "").upper()
+    except Exception:
+        raise HTTPException(status_code=400, detail="No es una imagen válida.")
+    if fmt not in ("JPEG", "PNG", "WEBP", "HEIC", "HEIF"):
+        raise HTTPException(status_code=400, detail="Formato no soportado (usa JPG, PNG o WEBP).")
+    if w * h > MAX_PIXELS:
+        raise HTTPException(status_code=413, detail="La imagen tiene demasiada resolución.")
     return data
 
 
@@ -122,9 +137,12 @@ async def generate(
     stylize: bool = Form(False),
     multitone: bool = Form(True),
     ai_numbers: int = Form(60),
+    request: Request = None,
     authorization: str = Header(default=""),
 ):
     _require_auth(authorization)
+    if request is not None:
+        _rate_limit("gen:" + _client_ip(request), limit=int(os.environ.get("GENERATE_RATE", "40")), window=3600)
     data = await _read_image(file)
     if stylize and not stylize_available():
         raise HTTPException(

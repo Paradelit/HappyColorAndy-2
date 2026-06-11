@@ -17,10 +17,12 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
 import time
+from collections import defaultdict
 from pathlib import Path
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -31,6 +33,26 @@ DB_PATH = DATA_DIR / "app.db"
 
 TOKEN_TTL = 60 * 60 * 24 * 30  # 30 dias
 MAX_CREATION_BYTES = 15 * 1024 * 1024
+
+# Rate limiting en memoria (anti fuerza bruta / spam de altas). Por proceso;
+# para varios workers/instancias conviene un store compartido (Redis).
+_RL = defaultdict(list)
+_RL_LOCK = threading.Lock()
+
+
+def _rate_limit(key: str, limit: int, window: int):
+    now = time.time()
+    with _RL_LOCK:
+        q = _RL[key]
+        q[:] = [t for t in q if t > now - window]
+        if len(q) >= limit:
+            raise HTTPException(status_code=429, detail="Demasiados intentos. Espera un momento.")
+        q.append(now)
+
+
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return (fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "?"))
 
 
 def _secret() -> bytes:
@@ -128,7 +150,8 @@ def _user_payload(row) -> dict:
 
 
 @router.post("/auth/register")
-def register(body: Credentials):
+def register(body: Credentials, request: Request):
+    _rate_limit("reg:" + _client_ip(request), limit=5, window=3600)
     email = body.email.strip().lower()
     if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         raise HTTPException(status_code=400, detail="Email no válido.")
@@ -148,11 +171,14 @@ def register(body: Credentials):
 
 
 @router.post("/auth/login")
-def login(body: Credentials):
+def login(body: Credentials, request: Request):
+    ip = _client_ip(request)
+    _rate_limit("login:" + ip, limit=10, window=900)
     email = body.email.strip().lower()
     with _db() as con:
         row = con.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
     if row is None or not hmac.compare_digest(_hash_pw(body.password, row["salt"]), row["pw_hash"]):
+        _rate_limit("loginfail:" + ip, limit=5, window=900)
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos.")
     return {"token": _make_token(row["id"]), "user": _user_payload(row)}
 

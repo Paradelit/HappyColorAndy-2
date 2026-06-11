@@ -22,6 +22,13 @@ const CM_ICONS = {
   chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
 };
 
+// Escapa texto para insertarlo con seguridad en innerHTML (evita XSS).
+function cmEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 const SvgGame = {
   ui: {},
   doc: null,
@@ -86,7 +93,45 @@ const SvgGame = {
     this.bindLanding();
     this.bindAuth();
     this.bindTutorial();
+    this.bindA11y();
     this.route();
+  },
+
+  // Accesibilidad de los modales (overlay .paywall / .ad-overlay): rol de
+  // diálogo, foco al abrir, devolver el foco al cerrar y Escape para cerrar.
+  bindA11y() {
+    const isOverlay = (n) => n && n.nodeType === 1 && n.classList &&
+      (n.classList.contains('paywall') || n.classList.contains('ad-overlay'));
+
+    new MutationObserver((muts) => {
+      muts.forEach((m) => {
+        m.addedNodes.forEach((n) => {
+          if (!isOverlay(n)) return;
+          const card = n.querySelector('.paywall-card, .ad-box') || n;
+          card.setAttribute('role', 'dialog');
+          card.setAttribute('aria-modal', 'true');
+          const h = card.querySelector('h2');
+          if (h) { if (!h.id) h.id = 'cmmt-' + Math.random().toString(36).slice(2, 7); card.setAttribute('aria-labelledby', h.id); }
+          this._lastFocus = document.activeElement;
+          const f = n.querySelector('input, button:not([disabled]), [tabindex]');
+          if (f) setTimeout(() => { try { f.focus(); } catch (e) { /* noop */ } }, 30);
+        });
+        m.removedNodes.forEach((n) => {
+          if (isOverlay(n) && this._lastFocus && this._lastFocus.focus) {
+            try { this._lastFocus.focus(); } catch (e) { /* noop */ }
+          }
+        });
+      });
+    }).observe(document.body, { childList: true });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const ovs = document.querySelectorAll('.paywall');
+      const top = ovs[ovs.length - 1];
+      if (!top) return;
+      const x = top.querySelector('.paywall-x');
+      if (x) x.click(); else top.remove();
+    });
   },
 
   // Decide la primera vista: sesión -> app; invitado -> app; nadie -> landing.
@@ -165,10 +210,10 @@ const SvgGame = {
         <button class="paywall-x" aria-label="Cerrar">✕</button>
         <h2>Ajustes</h2>
         <div class="acct-head">
-          <div class="acct-avatar">${logged ? email[0].toUpperCase() : CM_ICONS.user}</div>
+          <div class="acct-avatar">${logged ? cmEsc(email[0].toUpperCase()) : CM_ICONS.user}</div>
           <div class="acct-who">
-            <b>${logged ? email : 'Invitado'}</b>
-            <small>${logged ? 'Plan ' + Membership.plan().name : 'Solo en este dispositivo · Plan ' + Membership.plan().name}</small>
+            <b>${logged ? cmEsc(email) : 'Invitado'}</b>
+            <small>${logged ? 'Plan ' + cmEsc(Membership.plan().name) : 'Solo en este dispositivo · Plan ' + cmEsc(Membership.plan().name)}</small>
           </div>
         </div>
         ${accountRows ? '<div class="acct-sec">Cuenta</div>' + accountRows : ''}
@@ -260,8 +305,8 @@ const SvgGame = {
     document.getElementById('auth-title').textContent = login ? 'Entrar' : 'Crear cuenta';
     document.getElementById('auth-submit').textContent = login ? 'Entrar' : 'Crear cuenta';
     document.getElementById('auth-switch').innerHTML = login
-      ? '¿No tienes cuenta? <a id="auth-toggle">Crear cuenta</a>'
-      : '¿Ya tienes cuenta? <a id="auth-toggle">Entrar</a>';
+      ? '¿No tienes cuenta? <button type="button" class="linkbtn" id="auth-toggle">Crear cuenta</button>'
+      : '¿Ya tienes cuenta? <button type="button" class="linkbtn" id="auth-toggle">Entrar</button>';
     document.getElementById('auth-toggle').onclick = () =>
       this.showAuth(login ? 'register' : 'login');
     document.getElementById('auth-err').textContent = '';
@@ -299,7 +344,7 @@ const SvgGame = {
         <button class="paywall-x" aria-label="Cerrar">✕</button>
         <h2>Recuperar contraseña</h2>
         <p class="paywall-sub">Te enviaremos un enlace para crear una contraseña nueva.</p>
-        <input type="email" id="forgot-email" class="modal-input" placeholder="Email" value="${prefill.replace(/"/g, '&quot;')}">
+        <input type="email" id="forgot-email" class="modal-input" placeholder="Email" aria-label="Email" value="${cmEsc(prefill)}">
         <button class="plan-cta" id="forgot-send" style="width:100%">Enviar enlace</button>
         <div class="err" id="forgot-err"></div>
       </div>`;
@@ -442,13 +487,21 @@ const SvgGame = {
       const card = document.createElement('div');
       card.className = 'gal-card';
       const done = c.progress >= 100;
+      const pct = c.progress || 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', `Creación ${done ? 'completada' : pct + ' por ciento'}, abrir`);
       card.innerHTML =
         `<img class="thumb" src="${c.thumb || ''}" alt="">` +
-        `<button class="del" title="Borrar">✕</button>` +
-        `<div class="meta"><div class="bar"><div style="width:${c.progress || 0}%"></div></div>` +
-        `<div class="pct"><span>${done ? '<span class=\"done\">✓ Completo</span>' : (c.progress || 0) + '%'}</span></div></div>`;
-      card.querySelector('.thumb').onclick = () => this.resumeCreation(c.id);
-      card.querySelector('.meta').onclick = () => this.resumeCreation(c.id);
+        `<button class="del" title="Borrar" aria-label="Borrar creación">✕</button>` +
+        `<div class="meta"><div class="bar"><div style="width:${pct}%"></div></div>` +
+        `<div class="pct"><span>${done ? '<span class=\"done\">✓ Completo</span>' : pct + '%'}</span></div></div>`;
+      const open = () => this.resumeCreation(c.id);
+      card.querySelector('.thumb').onclick = open;
+      card.querySelector('.meta').onclick = open;
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
       card.querySelector('.del').onclick = async (e) => {
         e.stopPropagation();
         if (confirm('¿Borrar esta creación?')) {
@@ -857,7 +910,7 @@ const SvgGame = {
           <h2>Te quedaste sin pistas</h2>
           <p class="paywall-sub">Mira un anuncio corto y consigue ${Hints.PER_AD} pistas más.</p>
           <button class="plan-cta" id="hintad-go" style="width:100%">Ver anuncio</button>
-          <p class="paywall-note">¿Sin anuncios y pistas ilimitadas? <a id="hintad-plus" style="color:#764ba2;font-weight:700;cursor:pointer">Hazte Plus</a></p>
+          <p class="paywall-note">¿Sin anuncios y pistas ilimitadas? <button type="button" class="linkbtn" id="hintad-plus" style="color:#764ba2;font-weight:700">Hazte Plus</button></p>
         </div>`;
       document.body.appendChild(wrap);
       const done = (v) => { wrap.remove(); resolve(v); };
