@@ -107,6 +107,33 @@ const Auth = {
     if (error) throw new Error(error.message);
   },
 
+  // Recuperación de contraseña (envía email con enlace de vuelta a la app).
+  async resetPassword(email) {
+    if (!this.usesSupabase()) throw new Error('Disponible cuando actives el login en la nube.');
+    const { error } = await this.client().auth.resetPasswordForEmail(email, {
+      redirectTo: location.origin + location.pathname,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  // Fija la nueva contraseña (tras volver del enlace de recuperación).
+  async updatePassword(password) {
+    if (!this.usesSupabase()) throw new Error('No disponible.');
+    const { error } = await this.client().auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+  },
+
+  // Token de acceso actual (para autorizar /generate en el backend).
+  async getAccessToken() {
+    if (this.usesSupabase()) {
+      try {
+        const { data: { session } } = await this.client().auth.getSession();
+        return session ? session.access_token : '';
+      } catch (e) { return ''; }
+    }
+    return this.token();
+  },
+
   // Restaura la sesión al abrir la app. Devuelve el user o null.
   async restore() {
     if (this.usesSupabase()) {

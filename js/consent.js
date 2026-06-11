@@ -53,7 +53,7 @@ const Consent = {
     el.innerHTML =
       `<div class="consent-inner">
         <div class="consent-text">
-          🍪 Usamos almacenamiento necesario para que la app funcione y, con tu
+          Usamos almacenamiento necesario para que la app funcione y, con tu
           permiso, cookies de análisis y publicidad. Lee nuestra
           <a href="/privacy" target="_blank">Política de Privacidad</a>.
         </div>

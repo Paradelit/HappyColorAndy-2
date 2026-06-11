@@ -69,8 +69,8 @@
   .gal-card .pct { font-size: .72rem; color: #888; margin-top: 4px; display: flex; justify-content: space-between; }
   .gal-card .done { color: #4CAF50; font-weight: 700; }
   .gal-card .del { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: .9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  .gal-empty { color: #fff; text-align: center; margin: auto; opacity: .9; line-height: 1.6; }
-  .gal-empty .big { font-size: 3rem; margin-bottom: 8px; }
+  .gal-empty { color: #fff; text-align: center; margin: auto; opacity: .85; line-height: 1.6; font-size: .92rem; }
+  .gal-empty .empty-ic { width: 56px; height: 56px; opacity: .5; margin-bottom: 12px; }
   .card h1 { font-size: 1.4rem; color: #333; margin-bottom: 4px; }
   .card p.sub { color: #888; font-size: .85rem; margin-bottom: 20px; }
   .drop {
@@ -235,6 +235,8 @@
   .plan.pro .plan-cta { background: #d63384; }
   .plan-cta:disabled { background: #e6e6ec; color: #999; cursor: default; }
   .paywall-note { text-align: center; color: #aaa; font-size: .72rem; margin-top: 14px; }
+  .modal-input { width: 100%; box-sizing: border-box; border: 1.5px solid #ddd; border-radius: 12px; padding: 13px 14px; font-size: 1rem; margin-bottom: 12px; font-family: inherit; }
+  .modal-input:focus { outline: none; border-color: #764ba2; }
 
   /* ===== Anuncio (mock) ===== */
   .ad-overlay { position: fixed; inset: 0; z-index: 85; background: rgba(0,0,0,.88); display: flex; align-items: center; justify-content: center; padding: 18px; }
@@ -407,11 +409,20 @@
   .consent-row small { color: #999; font-size: .76rem; }
   .consent-row input { width: 20px; height: 20px; accent-color: #764ba2; flex: 0 0 auto; }
 
-  /* ===== Modal de cuenta ===== */
-  .acct-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-  .acct-item { text-align: left; border: 1px solid #ececf2; background: #fafafd; border-radius: 12px; padding: 13px 14px; font-weight: 600; font-size: .92rem; color: #333; cursor: pointer; }
-  .acct-item:active { transform: scale(.99); }
-  .acct-item.danger { color: #c0392b; border-color: #f3c9c3; background: #fdf3f1; }
+  /* ===== Ajustes (modal de cuenta) ===== */
+  .acct-head { display: flex; align-items: center; gap: 13px; margin: 12px 0 4px; }
+  .acct-avatar { width: 46px; height: 46px; flex: 0 0 auto; border-radius: 50%; background: linear-gradient(135deg, #ff4d9d, #7c4dff); color: #fff; font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+  .acct-avatar svg { width: 22px; height: 22px; }
+  .acct-who { min-width: 0; }
+  .acct-who b { display: block; color: #222; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acct-who small { color: #9898a4; font-size: .78rem; }
+  .acct-sec { font-size: .66rem; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: #ababb8; margin: 18px 2px 8px; }
+  .acct-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: none; background: #f6f6f9; border-radius: 13px; padding: 13px 14px; margin-bottom: 7px; font-family: inherit; font-weight: 600; font-size: .9rem; color: #2e2e36; cursor: pointer; }
+  .acct-row:active { transform: scale(.99); }
+  .acct-row > svg:first-child { width: 19px; height: 19px; color: #7c4dff; flex: 0 0 auto; }
+  .acct-row .chev { margin-left: auto; width: 15px; height: 15px; color: #c6c6d2; flex: 0 0 auto; }
+  .acct-row.danger { color: #c0392b; background: #fdf3f0; }
+  .acct-row.danger > svg:first-child { color: #c0392b; }
 </style>
 </head>
 <body>
@@ -528,6 +539,7 @@
       <input type="password" id="auth-pass" placeholder="Contraseña (mín. 6)" autocomplete="current-password">
       <button class="btn" id="auth-submit">Crear cuenta</button>
       <div class="err" id="auth-err"></div>
+      <p class="auth-switch" id="auth-forgot" hidden><a id="auth-forgot-link">¿Olvidaste tu contraseña?</a></p>
       <p class="auth-switch" id="auth-switch">¿Ya tienes cuenta? <a id="auth-toggle">Entrar</a></p>
     </div>
   </div>
@@ -555,13 +567,13 @@
       </h1>
       <div class="gal-actions">
         <button class="plan-chip" id="plan-chip" title="Tu plan" hidden>✨ Plus</button>
-        <button class="icon-btn" id="btn-account" title="Cuenta" aria-label="Cuenta">⚙️</button>
+        <button class="icon-btn" id="btn-account" title="Ajustes" aria-label="Ajustes"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34 1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87 1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
         <button class="btn-new" id="btn-new">+ Nueva</button>
       </div>
     </div>
     <div id="gal-grid" class="gal-grid"></div>
     <div id="gal-empty" class="gal-empty" hidden>
-      <div class="big">🖼️</div>
+      <svg class="empty-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
       Aún no tienes creaciones.<br>Pulsa <b>+ Nueva</b> para convertir una foto.
     </div>
   </div>

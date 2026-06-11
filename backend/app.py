@@ -13,11 +13,12 @@ Ejecutar local:
 
 import io
 import os
+import urllib.request
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -45,6 +46,48 @@ app.add_middleware(
 )
 
 MAX_BYTES = 25 * 1024 * 1024  # 25 MB
+
+# --- Proteccion opcional de /generate (anti-abuso) -------------------------
+# GENERATE_REQUIRE_AUTH=true exige un token valido para generar. Acepta:
+#  - tokens de Supabase (si SUPABASE_URL esta definido): se validan contra
+#    {SUPABASE_URL}/auth/v1/user
+#  - tokens del login propio (accounts.py)
+# Por defecto esta DESACTIVADO (los invitados pueden generar).
+GENERATE_REQUIRE_AUTH = os.environ.get("GENERATE_REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+
+
+def _supabase_token_ok(token: str) -> bool:
+    if not (SUPABASE_URL and token):
+        return False
+    try:
+        req = urllib.request.Request(
+            f"{SUPABASE_URL}/auth/v1/user",
+            headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON_KEY},
+        )
+        with urllib.request.urlopen(req, timeout=6) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def _own_token_ok(token: str) -> bool:
+    try:
+        from accounts import _check_token
+        _check_token(token)
+        return True
+    except Exception:
+        return False
+
+
+def _require_auth(authorization: str) -> None:
+    if not GENERATE_REQUIRE_AUTH:
+        return
+    token = authorization[7:] if authorization.startswith("Bearer ") else ""
+    if _supabase_token_ok(token) or _own_token_ok(token):
+        return
+    raise HTTPException(status_code=401, detail="Inicia sesión para crear cuadros.")
 
 
 async def _read_image(file: UploadFile) -> bytes:
@@ -79,7 +122,9 @@ async def generate(
     stylize: bool = Form(False),
     multitone: bool = Form(True),
     ai_numbers: int = Form(60),
+    authorization: str = Header(default=""),
 ):
+    _require_auth(authorization)
     data = await _read_image(file)
     if stylize and not stylize_available():
         raise HTTPException(

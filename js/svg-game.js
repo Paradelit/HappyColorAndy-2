@@ -5,6 +5,23 @@
 // Reusa los patrones de pan/zoom y de paleta del juego raster (js/game.js)
 // pero NO usa flood-fill ni worker: la unidad es la region SVG.
 
+// Iconos de línea (estilo Feather, stroke=currentColor) para los ajustes y
+// modales: aspecto profesional y consistente, sin emojis.
+const CM_ICONS = {
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15 8m-3.4 3.6L19 4m-4 0l3 3"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+  device: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 18h.01"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+};
+
 const SvgGame = {
   ui: {},
   doc: null,
@@ -74,6 +91,14 @@ const SvgGame = {
 
   // Decide la primera vista: sesión -> app; invitado -> app; nadie -> landing.
   async route() {
+    // enlace de recuperación de contraseña (Supabase) -> pedir la nueva
+    if (Auth.usesSupabase()) {
+      try {
+        Auth.client().auth.onAuthStateChange((event) => {
+          if (event === 'PASSWORD_RECOVERY') this.openNewPasswordModal();
+        });
+      } catch (e) { /* noop */ }
+    }
     // pinta la galería ya si parece haber sesión (la validación va detrás)
     if (Auth.token() || Auth.isGuest()) this.showGallery();
     const user = await Auth.restore();
@@ -120,29 +145,39 @@ const SvgGame = {
 
   updateAccountBtn() { /* el botón es un icono ⚙️ fijo */ },
 
-  // Modal de cuenta: sesión/legal/cookies + derechos RGPD (exportar / borrar).
+  // Ajustes: perfil + secciones (cuenta, privacidad, sesión) con iconos de línea.
   openAccount() {
     const logged = Auth.isLogged();
     const email = logged ? Auth.user.email : null;
-    const plan = Membership.plan().name;
+    const member = Membership.isMember();
+    const row = (act, icon, label, cls = '') =>
+      `<button class="acct-row ${cls}" data-act="${act}">${CM_ICONS[icon]}<span>${label}</span>${CM_ICONS.chev}</button>`;
+
+    const accountRows =
+      (logged ? '' : row('login', 'key', 'Entrar o crear cuenta')) +
+      (member ? '' : row('plus', 'star', 'Hazte Plus — sin anuncios')) +
+      (window.__deferredPrompt ? row('install', 'device', 'Instalar la aplicación') : '');
+
     const wrap = document.createElement('div');
     wrap.className = 'paywall';
     wrap.innerHTML =
-      `<div class="paywall-card">
+      `<div class="paywall-card acct-sheet">
         <button class="paywall-x" aria-label="Cerrar">✕</button>
-        <h2>Cuenta</h2>
-        <p class="paywall-sub">${logged ? email + ' · Plan ' + plan : 'Estás como invitado (solo este dispositivo). Plan ' + plan + '.'}</p>
-        <div class="acct-list">
-          ${logged ? '' : '<button class="acct-item" data-act="login">🔑 Entrar o crear cuenta</button>'}
-          ${Membership.isMember() ? '' : '<button class="acct-item" data-act="plus">✨ Hazte Plus (sin anuncios)</button>'}
-          ${window.__deferredPrompt ? '<button class="acct-item" data-act="install">📲 Instalar la app</button>' : ''}
-          <button class="acct-item" data-act="cookies">🍪 Privacidad y cookies</button>
-          <button class="acct-item" data-act="privacy">📄 Política de privacidad</button>
-          <button class="acct-item" data-act="terms">📄 Términos y condiciones</button>
-          ${logged ? '<button class="acct-item" data-act="export">⬇️ Descargar mis datos</button>' : ''}
-          ${logged ? '<button class="acct-item" data-act="logout">🚪 Cerrar sesión</button>' : ''}
-          ${logged ? '<button class="acct-item danger" data-act="delete">🗑️ Borrar mi cuenta</button>' : ''}
+        <h2>Ajustes</h2>
+        <div class="acct-head">
+          <div class="acct-avatar">${logged ? email[0].toUpperCase() : CM_ICONS.user}</div>
+          <div class="acct-who">
+            <b>${logged ? email : 'Invitado'}</b>
+            <small>${logged ? 'Plan ' + Membership.plan().name : 'Solo en este dispositivo · Plan ' + Membership.plan().name}</small>
+          </div>
         </div>
+        ${accountRows ? '<div class="acct-sec">Cuenta</div>' + accountRows : ''}
+        <div class="acct-sec">Privacidad</div>
+        ${row('cookies', 'shield', 'Privacidad y cookies')}
+        ${row('privacy', 'doc', 'Política de privacidad')}
+        ${row('terms', 'doc', 'Términos y condiciones')}
+        ${logged ? row('export', 'download', 'Descargar mis datos') : ''}
+        ${logged ? '<div class="acct-sec">Sesión</div>' + row('logout', 'logout', 'Cerrar sesión') + row('delete', 'trash', 'Borrar mi cuenta', 'danger') : ''}
       </div>`;
     document.body.appendChild(wrap);
     const close = () => wrap.remove();
@@ -230,9 +265,11 @@ const SvgGame = {
     document.getElementById('auth-toggle').onclick = () =>
       this.showAuth(login ? 'register' : 'login');
     document.getElementById('auth-err').textContent = '';
-    // "Continuar con Google" solo si Supabase está configurado
+    // "Continuar con Google" y recuperación solo si Supabase está configurado
     const gw = document.getElementById('auth-google-wrap');
     if (gw) gw.hidden = !Auth.usesSupabase();
+    const fg = document.getElementById('auth-forgot');
+    if (fg) fg.hidden = !(login && Auth.usesSupabase());
     this.hideAllViews();
     this.ui.authView.style.display = 'flex';
   },
@@ -247,6 +284,68 @@ const SvgGame = {
     if (g) g.onclick = async () => {
       try { await Auth.loginWithGoogle(); }
       catch (e) { document.getElementById('auth-err').textContent = 'No se pudo iniciar con Google.'; }
+    };
+    const fl = document.getElementById('auth-forgot-link');
+    if (fl) fl.onclick = () => this.openForgotModal();
+  },
+
+  // ---------- recuperación de contraseña ----------
+  openForgotModal() {
+    const prefill = document.getElementById('auth-email').value.trim();
+    const wrap = document.createElement('div');
+    wrap.className = 'paywall';
+    wrap.innerHTML =
+      `<div class="paywall-card">
+        <button class="paywall-x" aria-label="Cerrar">✕</button>
+        <h2>Recuperar contraseña</h2>
+        <p class="paywall-sub">Te enviaremos un enlace para crear una contraseña nueva.</p>
+        <input type="email" id="forgot-email" class="modal-input" placeholder="Email" value="${prefill.replace(/"/g, '&quot;')}">
+        <button class="plan-cta" id="forgot-send" style="width:100%">Enviar enlace</button>
+        <div class="err" id="forgot-err"></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.querySelector('.paywall-x').onclick = close;
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+    wrap.querySelector('#forgot-send').onclick = async () => {
+      const email = wrap.querySelector('#forgot-email').value.trim();
+      const err = wrap.querySelector('#forgot-err');
+      if (!email) { err.textContent = 'Escribe tu email.'; return; }
+      const btn = wrap.querySelector('#forgot-send');
+      btn.disabled = true; btn.textContent = 'Enviando…';
+      try {
+        await Auth.resetPassword(email);
+        close();
+        toast('Enlace enviado. Revisa tu correo.');
+      } catch (e) {
+        err.textContent = e.message;
+        btn.disabled = false; btn.textContent = 'Enviar enlace';
+      }
+    };
+  },
+
+  // Tras volver del enlace de recuperación: pedir la contraseña nueva.
+  openNewPasswordModal() {
+    const wrap = document.createElement('div');
+    wrap.className = 'paywall';
+    wrap.innerHTML =
+      `<div class="paywall-card">
+        <h2>Nueva contraseña</h2>
+        <p class="paywall-sub">Crea tu nueva contraseña para terminar.</p>
+        <input type="password" id="newpass" class="modal-input" placeholder="Nueva contraseña (mín. 6)">
+        <button class="plan-cta" id="newpass-save" style="width:100%">Guardar</button>
+        <div class="err" id="newpass-err"></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector('#newpass-save').onclick = async () => {
+      const pass = wrap.querySelector('#newpass').value;
+      const err = wrap.querySelector('#newpass-err');
+      if (pass.length < 6) { err.textContent = 'Mínimo 6 caracteres.'; return; }
+      try {
+        await Auth.updatePassword(pass);
+        wrap.remove();
+        toast('Contraseña actualizada');
+      } catch (e) { err.textContent = e.message; }
     };
   },
 
@@ -423,7 +522,10 @@ const SvgGame = {
     // El anuncio se reproduce MIENTRAS se genera (free); Plus no ve anuncios.
     const adPromise = Ads.gate('create');
     try {
-      const res = await fetch(base + '/generate', { method: 'POST', body: fd });
+      const headers = {};
+      const tk = await Auth.getAccessToken();
+      if (tk) headers['Authorization'] = 'Bearer ' + tk;
+      const res = await fetch(base + '/generate', { method: 'POST', body: fd, headers });
       if (!res.ok) {
         let detail;
         try { detail = (await res.json()).detail; } catch (_) { detail = await res.text(); }
@@ -754,7 +856,7 @@ const SvgGame = {
           <button class="paywall-x" aria-label="Cerrar">✕</button>
           <h2>Te quedaste sin pistas</h2>
           <p class="paywall-sub">Mira un anuncio corto y consigue ${Hints.PER_AD} pistas más.</p>
-          <button class="plan-cta" id="hintad-go" style="width:100%">📺 Ver anuncio</button>
+          <button class="plan-cta" id="hintad-go" style="width:100%">Ver anuncio</button>
           <p class="paywall-note">¿Sin anuncios y pistas ilimitadas? <a id="hintad-plus" style="color:#764ba2;font-weight:700;cursor:pointer">Hazte Plus</a></p>
         </div>`;
       document.body.appendChild(wrap);

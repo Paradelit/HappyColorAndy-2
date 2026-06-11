@@ -49,6 +49,9 @@ Para uso real, sube el plan a `standard` (2 GB) en `render.yaml` o desde el pane
 | `STYLIZE_PROVIDER` | `gemini`    | `gemini` (gratis) u `openai` (de pago). |
 | `STYLIZE_MODEL`    | (auto)      | Forzar un modelo concreto (opcional). |
 | `CORS_ORIGINS`     | `*`         | Orígenes permitidos si el frontend se hospeda aparte. |
+| `GENERATE_REQUIRE_AUTH` | (off)  | `true` = solo usuarios con sesión pueden generar (anti-abuso). |
+| `SUPABASE_URL`     | (vacío)     | URL del proyecto Supabase (para validar sus tokens en `/generate`). |
+| `SUPABASE_ANON_KEY`| (vacío)     | anon key de Supabase (solo para esa validación). |
 | `PORT`             | `8000`      | Lo inyecta la plataforma; no lo toques. |
 | `FRONTEND_DIR`     | `/app`      | Dónde está `upload.html` (ya configurado en el Dockerfile). |
 

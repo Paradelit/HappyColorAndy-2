@@ -19,7 +19,7 @@ const PLANS = {
   plus: {
     id: 'plus', name: 'Plus', price: '€5 · pago único',
     ads: false,
-    perks: ['Sin anuncios', 'Pistas ilimitadas', 'Apoyas el desarrollo 💜'],
+    perks: ['Sin anuncios', 'Pistas ilimitadas', 'Apoyas el desarrollo'],
   },
 };
 
