@@ -201,12 +201,12 @@ async def preview(
 
 # ----------------------------------------------------------------------------
 # Servir el frontend estatico (mismo origen que el API -> sin CORS).
-# FRONTEND_DIR apunta a la carpeta con upload.html + js/ (por defecto, la raiz
+# FRONTEND_DIR apunta a la carpeta con index.html + js/ (por defecto, la raiz
 # del repo, un nivel por encima de backend/). Se montan rutas concretas para no
 # tapar los endpoints del API.
 # ----------------------------------------------------------------------------
 FRONTEND_DIR = Path(os.environ.get("FRONTEND_DIR", Path(__file__).resolve().parent.parent))
-_INDEX = FRONTEND_DIR / "upload.html"
+_INDEX = FRONTEND_DIR / "index.html"
 
 
 @app.get("/")

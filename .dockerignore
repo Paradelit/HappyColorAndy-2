@@ -1,33 +1,16 @@
-# Mantiene el contexto de build pequeño: fuera git, caches, la app antigua y la
-# media pesada (no la usa el MVP nuevo: upload.html + js/{svg-game,creations,finale}).
+# Contexto de build: solo Color Memories (la app que se publica).
 .git
 .gitignore
 **/__pycache__
 **/*.pyc
 backend/data
+backend/tests
 
-# media pesada (musica, imagenes de referencia, icono enorme)
-*.mp3
-*.png
-# ...pero SI los iconos PWA (pequenos)
-!icon-192.png
-!icon-512.png
-
-# app antigua (index.html + sus modulos) — el MVP nuevo no la necesita
-index.html
-js/game.js
-js/data.js
-js/gallery.js
-js/gallery_backup.js
-js/audio.js
-js/keys.js
-js/sync.js
-js/tutorial.js
-js/worker.js
-js/db.js
-
-# docs
-*.md
+# La app ANTIGUA (HappyColor Andy-2) y herramientas de dev no van en la imagen.
+legacy/
 node_modules/
 package.json
 scripts/
+
+# docs
+*.md

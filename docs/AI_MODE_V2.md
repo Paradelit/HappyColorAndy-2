@@ -28,7 +28,7 @@ dibujo con tinta limpia, no de una foto con ruido/degradados.
 | Overlay vectorial desde la tinta | `lineart.py` → `line_overlay_path()` | ✅ |
 | Rama `stylize=True` en el pipeline | `backend/pipeline/runner.py` | ✅ intacta (se ejecuta si llega `stylize=true`) |
 | Endpoint `/capabilities` (dice si hay clave IA) | `backend/app.py` | ✅ |
-| Toggle de IA + selector multitono/plano en la UI | `upload.html` (`#ai-toggle`) | 🔒 **oculto en v1** (`svg-game.js` fuerza `aiToggle.hidden = true`) |
+| Toggle de IA + selector multitono/plano en la UI | `index.html` (`#ai-toggle`) | 🔒 **oculto en v1** (`svg-game.js` fuerza `aiToggle.hidden = true`) |
 | Doc de configuración del proveedor | `backend/STYLIZE.md` | ✅ |
 
 ### Cómo se activa hoy (técnicamente)
