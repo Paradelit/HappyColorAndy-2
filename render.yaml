@@ -1,9 +1,9 @@
 # Blueprint de Render (https://render.com) — despliegue en 1 clic desde el repo.
 # En Render: New > Blueprint > elige este repo. Lee este fichero, construye el
-# Dockerfile y publica una URL HTTPS. Define STYLIZE_API_KEY en el panel (secreto).
+# Dockerfile y publica una URL HTTPS.
 services:
   - type: web
-    name: happycolor
+    name: color-memories
     runtime: docker
     dockerfilePath: ./Dockerfile
     # 'free' (512 MB) sirve para PROBAR (se duerme tras inactividad). Para uso
@@ -11,18 +11,21 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
-      - key: SECRET_KEY           # firma de los tokens de sesión (login)
+      - key: SECRET_KEY           # firma de los tokens del login propio (fallback)
         generateValue: true
-      - key: STYLIZE_API_KEY      # clave Gemini (IA, aún sin usar en v1). Secreto.
-        sync: false               # se introduce en el panel, no en el repo
-      - key: STYLIZE_PROVIDER
-        value: gemini
       - key: CORS_ORIGINS         # mismo origen -> no hace falta; "*" por si acaso
         value: "*"
-    # PERSISTENCIA: las cuentas y el progreso (SQLite) viven en DATA_DIR. Sin un
-    # disco, se BORRAN en cada deploy. Para producción añade un disco (plan de
-    # pago) y descomenta:
+      # Opcionales (no hacen falta para lanzar):
+      # - key: STYLIZE_API_KEY    # clave Gemini para el modo IA (v2). Secreto.
+      #   sync: false
+      # - key: GENERATE_REQUIRE_AUTH  # "true" = solo usuarios con sesión generan
+      #   value: "false"
+    # PERSISTENCIA: usando **Supabase** (recomendado), el backend NO guarda nada
+    # en disco (solo genera el cuadro y sirve la web), así que el plan 'free' vale
+    # sin disco. Si en su lugar usas el login propio (SQLite en DATA_DIR), añade
+    # un disco para no perder las cuentas en cada deploy:
     # disk:
     #   name: data
     #   mountPath: /app/backend/data
     #   sizeGB: 1
+
