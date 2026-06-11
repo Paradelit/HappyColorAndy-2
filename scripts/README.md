@@ -1,4 +1,21 @@
-# Capturas de UI (dev)
+# Capturas de UI y tests e2e (dev)
+
+## Tests end-to-end (`scripts/e2e.js`)
+Suite de 31 asserts que recorre los flujos críticos con Chromium headless:
+landing → registro/invitado → tutorial → generar (con/sin anuncio según plan)
+→ pintar → pista → final/timelapse → persistencia → paywall demo.
+
+```bash
+# 1) arranca el servidor
+(cd backend && uvicorn app:app --port 8000 &)
+# 2) lanza la suite (sale con código 1 si algo falla)
+node scripts/e2e.js http://localhost:8000     # o: npm run e2e
+```
+
+Cada escenario corre en un contexto de navegador aislado (storage y service
+worker limpios). Esta suite es la **red de seguridad para refactorizar**
+`svg-game.js` después del lanzamiento.
+
 
 Herramientas para hacer **capturas reales** de la app con Chromium headless, y
 así poder revisar la interfaz en este entorno (Claude Code en la web).
