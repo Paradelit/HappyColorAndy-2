@@ -1,0 +1,26 @@
+# Capturas de UI (dev)
+
+Herramientas para hacer **capturas reales** de la app con Chromium headless, y
+así poder revisar la interfaz en este entorno (Claude Code en la web).
+
+## Por qué funciona aquí
+La política de red de este entorno bloquea la descarga de Chromium de Playwright
+y de `apt`, **pero sí permite la de Puppeteer** (otro host). Chromium se ejecuta
+con `--no-sandbox` porque el contenedor corre como root.
+
+## Uso
+```bash
+# 1) una vez por sesión (lo hace solo el hook SessionStart en segundo plano):
+bash scripts/setup-screenshots.sh
+
+# 2) arranca el servidor y captura:
+(cd backend && uvicorn app:app --port 8000 &)
+node scripts/screenshot.js http://localhost:8000/ landing.png 402 --full
+```
+
+- `ancho < 700` → modo móvil (deviceScaleFactor 2). `--full` = página completa.
+- Para automatizarlo en cada sesión, este repo trae un hook `SessionStart` en
+  `.claude/settings.json` que ejecuta `setup-screenshots.sh` en segundo plano.
+
+> `node_modules/` está en `.gitignore`: no se commitea Chromium. Tampoco entra en
+> la imagen Docker (el Dockerfile solo copia el backend + el frontend).

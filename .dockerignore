@@ -28,3 +28,6 @@ js/db.js
 
 # docs
 *.md
+node_modules/
+package.json
+scripts/

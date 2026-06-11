@@ -28,30 +28,36 @@
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { display: flex; flex-direction: column; background: #f0f0f0; overflow: hidden; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; background: #140d2b; overflow: hidden; }
+  :root { --cm-bg:
+      radial-gradient(900px 520px at 82% -8%, rgba(124,77,255,.40), transparent 60%),
+      radial-gradient(720px 520px at -12% 16%, rgba(255,77,157,.24), transparent 55%),
+      #140d2b; }
 
   /* ---------- Vista de subida ---------- */
   #upload-view {
     flex: 1; display: none; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; overflow-y: auto;
+    background: var(--cm-bg); padding: 20px; overflow-y: auto;
   }
   .card {
-    background: #fff; border-radius: 20px; padding: 28px; width: 100%; max-width: 440px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.3); position: relative;
+    background: #fff; border-radius: 22px; padding: 26px; width: 100%; max-width: 440px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.45); position: relative;
   }
-  .card-back { position: absolute; top: 16px; left: 16px; width: 36px; height: 36px; border: none; border-radius: 50%; background: #f0f0f4; font-size: 1.1rem; cursor: pointer; }
+  .card-back { position: static; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; margin-bottom: 14px; border: none; border-radius: 50%; background: #f0f0f4; font-size: 1.1rem; cursor: pointer; }
 
   /* ===== Galería "Mis creaciones" ===== */
-  #gallery-view { flex: 1; display: none; flex-direction: column; background: linear-gradient(135deg, #667eea, #764ba2); overflow-y: auto; }
-  .gal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 8px; }
-  .gal-header h1 { color: #fff; font-size: 1.35rem; }
+  #gallery-view { flex: 1; display: none; flex-direction: column; background: var(--cm-bg); overflow-y: auto; }
+  .gal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 16px 10px; }
+  .gal-title { color: #fff; font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 8px; letter-spacing: -.3px; }
+  .gal-title svg { width: 22px; height: 22px; flex: 0 0 auto; }
   .gal-actions { display: flex; gap: 8px; align-items: center; }
-  .btn-new { border: none; border-radius: 12px; padding: 10px 16px; font-weight: 700; font-size: .95rem; background: #fff; color: #764ba2; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+  .btn-new { border: none; border-radius: 12px; padding: 10px 15px; font-weight: 800; font-size: .9rem; background: linear-gradient(100deg, #ff4d9d, #7c4dff); color: #fff; cursor: pointer; box-shadow: 0 8px 20px rgba(124,77,255,.45); white-space: nowrap; }
   .btn-new:active { transform: scale(.96); }
-  .btn-install { border: 1.5px solid rgba(255,255,255,.7); border-radius: 12px; padding: 9px 12px; font-weight: 700; font-size: .85rem; background: rgba(255,255,255,.12); color: #fff; cursor: pointer; }
-  .btn-install:active { transform: scale(.96); }
-  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding: 14px 18px 28px; }
+  .icon-btn { width: 40px; height: 40px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(255,255,255,.08); color: #fff; cursor: pointer; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; }
+  .icon-btn:active { transform: scale(.94); }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding: 14px 16px 28px; }
   .gal-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.2); cursor: pointer; position: relative; }
   .gal-card:active { transform: scale(.97); }
   .gal-card .thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #eee; }
@@ -105,8 +111,9 @@
   .mode.selected small { color: #9b86c9; }
 
   .btn {
-    width: 100%; border: none; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 700;
-    color: #fff; background: #d63384; cursor: pointer; transition: .15s;
+    width: 100%; border: none; border-radius: 13px; padding: 15px; font-size: 1.02rem; font-weight: 800;
+    color: #fff; background: linear-gradient(100deg, #ff4d9d, #7c4dff); cursor: pointer; transition: .15s;
+    box-shadow: 0 10px 26px rgba(124,77,255,.4);
   }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
   .btn:active:not(:disabled) { transform: scale(.97); }
@@ -350,7 +357,7 @@
   }
 
   /* ===== Auth ===== */
-  #auth-view { flex: 1; display: none; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; overflow-y: auto; }
+  #auth-view { flex: 1; display: none; align-items: center; justify-content: center; background: var(--cm-bg); padding: 20px; overflow-y: auto; }
   .auth-card input { width: 100%; box-sizing: border-box; border: 1.5px solid #ddd; border-radius: 12px; padding: 13px 14px; font-size: 1rem; margin-bottom: 12px; }
   .auth-card input:focus { outline: none; border-color: #764ba2; }
   .auth-switch { text-align: center; font-size: .85rem; color: #777; margin-top: 14px; }
@@ -527,11 +534,13 @@
   <!-- ===== Galería "Mis creaciones" (home) ===== -->
   <div id="gallery-view">
     <div class="gal-header">
-      <h1>🎨 Mis creaciones</h1>
+      <h1 class="gal-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path fill="url(#hG)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
+        Mis creaciones
+      </h1>
       <div class="gal-actions">
-        <button class="plan-chip" id="plan-chip" title="Tu plan">Gratis</button>
-        <button class="btn-install" id="btn-install" hidden>⬇️ Instalar</button>
-        <button class="btn-install" id="btn-account">Salir</button>
+        <button class="plan-chip" id="plan-chip" title="Tu plan" hidden>✨ Plus</button>
+        <button class="icon-btn" id="btn-account" title="Cuenta" aria-label="Cuenta">⚙️</button>
         <button class="btn-new" id="btn-new">+ Nueva</button>
       </div>
     </div>
@@ -622,26 +631,14 @@
     </div>
   </div>
 
-  <!-- PWA: registro del service worker + botón de instalación -->
+  <!-- PWA: registro del service worker + prompt de instalación (vía menú Cuenta) -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
     }
-    let deferredPrompt = null;
-    const installBtn = document.getElementById('btn-install');
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      if (installBtn) installBtn.hidden = false;
-    });
-    if (installBtn) installBtn.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      installBtn.hidden = true;
-    });
-    window.addEventListener('appinstalled', () => { if (installBtn) installBtn.hidden = true; });
+    window.__deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__deferredPrompt = e; });
+    window.addEventListener('appinstalled', () => { window.__deferredPrompt = null; });
   </script>
 
   <script src="js/auth.js"></script>

@@ -118,9 +118,7 @@ const SvgGame = {
     document.addEventListener('hints-changed', () => this.updateHintBadge());
   },
 
-  updateAccountBtn() {
-    this.ui.accountBtn.textContent = Auth.isLogged() ? '⚙️ Cuenta' : '⚙️';
-  },
+  updateAccountBtn() { /* el botón es un icono ⚙️ fijo */ },
 
   // Modal de cuenta: sesión/legal/cookies + derechos RGPD (exportar / borrar).
   openAccount() {
@@ -137,6 +135,7 @@ const SvgGame = {
         <div class="acct-list">
           ${logged ? '' : '<button class="acct-item" data-act="login">🔑 Entrar o crear cuenta</button>'}
           ${Membership.isMember() ? '' : '<button class="acct-item" data-act="plus">✨ Hazte Plus (sin anuncios)</button>'}
+          ${window.__deferredPrompt ? '<button class="acct-item" data-act="install">📲 Instalar la app</button>' : ''}
           <button class="acct-item" data-act="cookies">🍪 Privacidad y cookies</button>
           <button class="acct-item" data-act="privacy">📄 Política de privacidad</button>
           <button class="acct-item" data-act="terms">📄 Términos y condiciones</button>
@@ -157,6 +156,11 @@ const SvgGame = {
   async accountAction(act, close) {
     if (act === 'login') { close(); this.showAuth('login'); }
     else if (act === 'plus') { close(); Membership.openPaywall('ads'); }
+    else if (act === 'install') {
+      close();
+      const dp = window.__deferredPrompt;
+      if (dp) { dp.prompt(); await dp.userChoice; window.__deferredPrompt = null; }
+    }
     else if (act === 'cookies') { close(); Consent.openPreferences(); }
     else if (act === 'privacy') { window.open('/privacy', '_blank'); }
     else if (act === 'terms') { window.open('/terms', '_blank'); }
@@ -180,9 +184,9 @@ const SvgGame = {
   },
 
   updatePlanChip() {
-    const p = Membership.plan();
     const member = Membership.isMember();
-    this.ui.planChip.textContent = member ? '✨ ' + p.name : p.name;
+    this.ui.planChip.hidden = !member;            // solo se muestra a los miembros
+    this.ui.planChip.textContent = '✨ ' + Membership.plan().name;
     this.ui.planChip.classList.toggle('member', member);
   },
 
