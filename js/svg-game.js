@@ -167,15 +167,14 @@ const SvgGame = {
     else if (act === 'logout') { close(); Auth.logout(); this.showLanding(); }
     else if (act === 'export') {
       try {
-        const data = await Auth.api('/user/export');
+        const data = await Auth.exportData();
         downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'mis-datos-color-memories.json');
       } catch (e) { toast('No se pudieron descargar los datos'); }
     }
     else if (act === 'delete') {
       if (!confirm('¿Seguro que quieres BORRAR tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return;
       try {
-        await Auth.api('/user/account', { method: 'DELETE' });
-        Auth.logout();
+        await Auth.deleteAccount();
         close();
         toast('Cuenta borrada');
         this.showLanding();
@@ -231,6 +230,9 @@ const SvgGame = {
     document.getElementById('auth-toggle').onclick = () =>
       this.showAuth(login ? 'register' : 'login');
     document.getElementById('auth-err').textContent = '';
+    // "Continuar con Google" solo si Supabase está configurado
+    const gw = document.getElementById('auth-google-wrap');
+    if (gw) gw.hidden = !Auth.usesSupabase();
     this.hideAllViews();
     this.ui.authView.style.display = 'flex';
   },
@@ -241,6 +243,11 @@ const SvgGame = {
     document.getElementById('auth-pass').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.submitAuth();
     });
+    const g = document.getElementById('auth-google');
+    if (g) g.onclick = async () => {
+      try { await Auth.loginWithGoogle(); }
+      catch (e) { document.getElementById('auth-err').textContent = 'No se pudo iniciar con Google.'; }
+    };
   },
 
   async submitAuth() {

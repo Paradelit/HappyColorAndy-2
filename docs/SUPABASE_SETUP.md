@@ -41,24 +41,37 @@ código (login con Google + email, y sincronización del progreso) y lo pruebo.
 3. **Redirect URLs**: añade tu URL de despliegue y `http://localhost:8000` (y la
    que use tu móvil si pruebas en red local).
 
-## 5) Pásame estos 2 valores (son PÚBLICOS, no secretos)
-Menú → **Project Settings → API**:
-- **Project URL** → `https://xxxx.supabase.co`
-- **anon public key** → `eyJ...` (la clave "anon", NO la "service_role")
-
-> La `anon key` está pensada para ir en el frontend: la seguridad la da el Row
-> Level Security del paso 2. **No** me pases la `service_role` (esa sí es secreta).
+## 5) Pega estos 2 valores (son PÚBLICOS, no secretos)
+Menú → **Project Settings → API**, y ponlos en **`js/config.js`**:
+```js
+window.CM_CONFIG = {
+  supabase: {
+    url: "https://xxxx.supabase.co",   // Project URL
+    anonKey: "eyJ...",                  // anon public key (NO la service_role)
+  },
+};
+```
+> La `anon key` va en el frontend a propósito: la seguridad la da el Row Level
+> Security del paso 2. **No** uses la `service_role` (esa sí es secreta).
+> Si prefieres, mándame los 2 valores y los pongo yo.
 
 ---
 
-## Qué hago yo cuando me los des
-- Cargo el SDK de Supabase y reescribo `js/auth.js` para usar Supabase Auth
-  (botón **"Continuar con Google"** + email/contraseña + recuperar contraseña).
-- Cambio la sincronización de creaciones para que vaya directa a Supabase (con
-  RLS), conservando el resto de la app igual (galería, juego, tutorial, plan…).
-- Pruebo el alta por email contra tu proyecto real y dejo el flujo de Google
-  listo para que lo verifiques en tu móvil.
-- (Opcional) Hago que `/generate` valide el token de Supabase para evitar abuso.
+## Ya está todo cableado ✅
+El código de la app **ya usa Supabase en cuanto rellenes `js/config.js`** (si lo
+dejas vacío, sigue con el login propio). Concretamente:
+- **`js/auth.js`** usa Supabase Auth: botón **"Continuar con Google"** + email/
+  contraseña, y guarda perfil (plan/pistas/tutorial) y creaciones en Supabase con RLS.
+- El SDK de Supabase va **vendorizado** en `js/supabase.js` (sin depender de CDN).
+- El resto de la app no cambia (galería, juego, tutorial, plan, paywall…).
+
+### Pendientes (los hago después, no bloquean probar)
+- **Recuperar contraseña**: Supabase ya lo soporta; falta añadir el enlace
+  "¿Olvidaste tu contraseña?" en la pantalla de login.
+- **Borrar cuenta completa**: hoy borra TODOS tus datos (creaciones/perfil) y
+  cierra sesión; eliminar también el usuario de `auth.users` requiere una función
+  con `service_role` en el servidor (lo añadimos cuando despleguemos).
+- (Opcional) Que `/generate` valide el token de Supabase para evitar abuso.
 
 ## Coste
 Plan **Free** de Supabase: 50.000 usuarios activos/mes, 500 MB de base de datos
