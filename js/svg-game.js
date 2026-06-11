@@ -451,6 +451,8 @@ const SvgGame = {
   showTutorial() {
     this.ui.tutorial.style.display = 'flex';
     this.renderTutorialStep(0);
+    const nx = document.getElementById('tut-next');
+    if (nx) setTimeout(() => { try { nx.focus(); } catch (e) { /* noop */ } }, 30);
   },
 
   renderTutorialStep(i) {
