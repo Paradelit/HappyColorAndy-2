@@ -377,8 +377,9 @@
   .tut-actions .next { flex: 2; border: none; background: #764ba2; color: #fff; border-radius: 12px; padding: 12px; font-weight: 700; cursor: pointer; }
 
   /* ===== badge de pistas ===== */
-  #tool-hint { position: relative; }
-  #tool-hint .hbadge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: #d63384; color: #fff; font-size: .62rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  #tool-hint { position: relative; background: linear-gradient(135deg, #ff4d9d, #7c4dff) !important; }
+  #tool-hint > span:first-child { filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+  #tool-hint .hbadge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: #ffce4a; color: #4a2e00; font-size: .64rem; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 
   /* ===== mobile-first: safe areas + toques ===== */
   button { touch-action: manipulation; }
@@ -408,6 +409,7 @@
 </style>
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="cmHeart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ff7eb0"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs></svg>
 
   <!-- ===== Landing premium (Color Memories) ===== -->
   <div id="landing-view">
@@ -415,7 +417,7 @@
 
     <nav class="lp-nav">
       <span class="lp-logo">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path fill="url(#hA)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="url(#cmHeart)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
         <b>Color Memories</b>
       </span>
       <button class="nav-cta" id="landing-login">Entrar</button>
@@ -496,7 +498,7 @@
 
     <footer class="lp-foot">
       <div class="brand">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path fill="url(#hB)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="url(#cmHeart)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
         Color Memories
       </div>
       © 2026 · <a href="/privacy" target="_blank">Privacidad</a> · <a href="/terms" target="_blank">Términos</a> · <a id="land-cookies">Cookies</a>
@@ -535,7 +537,7 @@
   <div id="gallery-view">
     <div class="gal-header">
       <h1 class="gal-title">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path fill="url(#hG)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="url(#cmHeart)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
         Mis creaciones
       </h1>
       <div class="gal-actions">

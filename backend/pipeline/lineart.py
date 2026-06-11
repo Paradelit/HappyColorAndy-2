@@ -100,7 +100,7 @@ def line_overlay_path(rgb, dark_thresh: float = 0.32, line_width: int = 7, simpl
     return _mask_to_path(_ink_lines(rgb, dark_thresh, line_width), simplify_tol)
 
 
-def number_overlay_path(region_map, numbers, simplify_tol: float = 0.6, thickness: int = 2) -> str:
+def number_overlay_path(region_map, numbers, simplify_tol: float = 0.9, thickness: int = 2) -> str:
     """Capa de DIBUJO en VECTOR para FOTOS (sin tinta que detectar): traza las
     fronteras donde cambia el NUMERO a pintar, como un libro de colorear hecho
     de la foto. Las fronteras entre piezas del MISMO numero (sub-tonos del
@@ -346,7 +346,7 @@ def _build_palette(numbers, means, centers, k, multitone, multitone_spread):
 
 
 def build_photo(rgb, n_numbers=60, max_cluster_pct=6.0, multitone=True,
-                multitone_spread=6.0, clean_radius=4, min_piece_pct=0.05):
+                multitone_spread=6.0, clean_radius=5, min_piece_pct=0.10):
     """Color-by-number para FOTOS con las MISMAS capacidades que el modo IA.
 
     Una foto no tiene tinta que detectar, asi que el "dibujo" se construye

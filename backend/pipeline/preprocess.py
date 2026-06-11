@@ -45,7 +45,7 @@ def smooth(rgb: np.ndarray, size: int = 3) -> np.ndarray:
     from skimage.restoration import denoise_tv_chambolle
 
     out = median_filter(rgb, size=(size, size, 1))
-    out = denoise_tv_chambolle(out.astype(np.float64) / 255.0, weight=0.08, channel_axis=-1)
+    out = denoise_tv_chambolle(out.astype(np.float64) / 255.0, weight=0.13, channel_axis=-1)
     return np.clip(np.round(out * 255.0), 0, 255).astype(np.uint8)
 
 

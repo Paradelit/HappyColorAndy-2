@@ -1,7 +1,7 @@
 // Service worker de Andy Color (PWA). Cachea el "app shell" para que arranque
 // offline y al instante; las llamadas al API (/generate, /capabilities…) siempre
 // van a la red.
-const CACHE = 'cm-v6';
+const CACHE = 'cm-v7';
 const SHELL = [
   '/',
   '/js/svg-game.js',
