@@ -1,13 +1,13 @@
 {
-  "name": "Andy Color — Foto a Color by Number",
-  "short_name": "Andy Color",
-  "description": "Convierte tus fotos en dibujos para pintar por números.",
+  "name": "Color Memories: Color by Number",
+  "short_name": "Color Memories",
+  "description": "Convierte tus fotos en cuadros de pintar por números. Pinta tus recuerdos, relájate y comparte el timelapse de tu obra.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#764ba2",
-  "theme_color": "#764ba2",
+  "background_color": "#160f2e",
+  "theme_color": "#160f2e",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

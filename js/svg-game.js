@@ -164,7 +164,7 @@ const SvgGame = {
     else if (act === 'export') {
       try {
         const data = await Auth.api('/user/export');
-        downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'mis-datos-andycolor.json');
+        downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'mis-datos-color-memories.json');
       } catch (e) { toast('No se pudieron descargar los datos'); }
     }
     else if (act === 'delete') {
@@ -208,6 +208,7 @@ const SvgGame = {
   bindLanding() {
     document.getElementById('landing-login').onclick = () => this.showAuth('login');
     document.getElementById('landing-cta').onclick = () => this.showAuth('register');
+    document.getElementById('landing-cta2').onclick = () => this.showAuth('register');
     document.getElementById('landing-guest').onclick = () => {
       Auth.setGuest(true);
       this.enterApp();

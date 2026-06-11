@@ -3,24 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Andy Color · Convierte tus fotos en pintar por números</title>
-<meta name="description" content="Sube una foto y conviértela en un cuadro de pintar por números. Pinta, relájate y comparte el timelapse de tu obra. Gratis, desde el móvil.">
-<meta property="og:title" content="Andy Color — Tus fotos, hechas pintar por números">
-<meta property="og:description" content="Sube una foto, píntala por números y comparte el timelapse de tu obra.">
+<title>Color Memories · Pinta tus recuerdos (Color by Number)</title>
+<meta name="description" content="Convierte tus fotos en cuadros de pintar por números (color by number). Pinta tus recuerdos, relájate y comparte el timelapse de tu obra. Gratis, desde el móvil.">
+<meta property="og:title" content="Color Memories — Pinta tus recuerdos">
+<meta property="og:description" content="Convierte tus fotos en cuadros de pintar por números. Píntalas y comparte el timelapse de tu obra.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="/icon-512.png">
 <meta name="twitter:card" content="summary">
 
 <!-- PWA -->
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#764ba2">
+<meta name="theme-color" content="#160f2e">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Andy Color">
+<meta name="apple-mobile-web-app-title" content="Color Memories">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" href="/icon-192.png">
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script>document.documentElement.classList.add('js');</script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -238,47 +242,112 @@
   .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); z-index: 90; background: #222; color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: .9rem; opacity: 0; transition: .3s; pointer-events: none; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-  /* ===== Landing ===== */
-  #landing-view { flex: 1; display: none; flex-direction: column; background: linear-gradient(160deg, #667eea, #764ba2 60%, #5a3d8a); overflow-y: auto; color: #fff; }
-  .land-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; padding-top: calc(14px + env(safe-area-inset-top)); }
-  .land-logo { font-weight: 800; font-size: 1.1rem; }
-  .land-nav button { border: 1.5px solid rgba(255,255,255,.75); background: rgba(255,255,255,.1); color: #fff; border-radius: 999px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
-  .hero { text-align: center; padding: 34px 24px 10px; max-width: 560px; margin: 0 auto; }
-  .hero h1 { font-size: 1.9rem; line-height: 1.2; }
-  .hero p { margin: 14px 0 22px; opacity: .92; line-height: 1.5; }
-  .cta { display: inline-block; border: none; border-radius: 14px; padding: 15px 30px; font-weight: 800; font-size: 1.05rem; background: #fff; color: #764ba2; cursor: pointer; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
-  .cta:active { transform: scale(.97); }
-  .guest-link { display: block; margin-top: 14px; color: rgba(255,255,255,.85); text-decoration: underline; font-size: .85rem; cursor: pointer; }
-  .demo-pair { display: flex; gap: 14px; justify-content: center; margin: 30px auto 6px; max-width: 380px; padding: 0 10px; }
-  .demo-pair > div { flex: 1; aspect-ratio: 1; border-radius: 16px; box-shadow: 0 10px 26px rgba(0,0,0,.32); position: relative; overflow: hidden; }
-  .demo-photo { background:
-    radial-gradient(circle at 72% 26%, #ffd24a 0 16%, transparent 17%),
-    linear-gradient(180deg, #7fb2ef 0 55%, #6aa15e 55%); }
-  .demo-cbn { background: #fff; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
-  .demo-cbn span { display: flex; align-items: center; justify-content: center; font-size: .72rem; color: #999; border: 1px solid #e6e6ee; }
-  .demo-cbn span.f1 { background: #7fb2ef; color: transparent; }
-  .demo-cbn span.f2 { background: #ffd24a; color: transparent; }
-  .demo-cbn span.f3 { background: #6aa15e; color: transparent; }
-  .demo-arrow { align-self: center; font-size: 1.5rem; flex: 0 0 auto; }
-  .feats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; padding: 26px 18px; max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-  .feat { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 14px; }
-  .feat .ic { font-size: 1.5rem; }
-  .feat b { display: block; margin: 6px 0 3px; font-size: .92rem; }
-  .feat small { opacity: .85; font-size: .78rem; line-height: 1.35; display: block; }
-  .how { text-align: center; padding: 8px 18px 6px; }
-  .how h2, .prices h2 { font-size: 1.25rem; margin-bottom: 14px; text-align: center; }
-  .steps { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
-  .step { flex: 1 1 150px; max-width: 200px; background: rgba(255,255,255,.1); border-radius: 14px; padding: 14px; font-size: .85rem; }
-  .step .n { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #764ba2; font-weight: 800; align-items: center; justify-content: center; margin-bottom: 8px; }
-  .prices { padding: 26px 18px 8px; }
-  .price-cards { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; max-width: 560px; margin: 0 auto; }
-  .price { flex: 1 1 180px; max-width: 240px; background: #fff; color: #333; border-radius: 16px; padding: 18px; text-align: center; }
-  .price.hl { outline: 3px solid #ffd24a; }
-  .price .amt { font-size: 1.6rem; font-weight: 800; color: #764ba2; }
-  .price ul { list-style: none; margin: 10px 0 0; padding: 0; font-size: .82rem; color: #555; }
-  .price li { padding: 3px 0; }
-  .land-foot { text-align: center; padding: 30px 18px calc(24px + env(safe-area-inset-bottom)); font-size: .75rem; opacity: .7; }
-  .land-foot a { color: #fff; }
+  /* ===== Landing premium (Color Memories) ===== */
+  #landing-view {
+    flex: 1; display: none; flex-direction: column; overflow-y: auto; color: #fff;
+    --v: #7c4dff; --m: #ff4d9d; --a: #ffb347;
+    background:
+      radial-gradient(900px 500px at 80% -8%, rgba(124,77,255,.45), transparent 60%),
+      radial-gradient(700px 500px at -10% 18%, rgba(255,77,157,.30), transparent 55%),
+      radial-gradient(700px 600px at 110% 80%, rgba(255,179,71,.18), transparent 55%),
+      #140d2b;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    scroll-behavior: smooth;
+  }
+  #landing-view::-webkit-scrollbar { width: 0; }
+  .lp-progress { position: sticky; top: 0; height: 3px; width: 0; z-index: 30;
+    background: linear-gradient(90deg, var(--m), var(--v), var(--a)); transition: width .1s linear; }
+
+  .lp-nav { position: sticky; top: 3px; z-index: 25; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; padding-top: calc(12px + env(safe-area-inset-top));
+    backdrop-filter: blur(12px); background: rgba(20,13,43,.55); border-bottom: 1px solid rgba(255,255,255,.07); }
+  .lp-logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.05rem; letter-spacing: -.2px; }
+  .lp-logo svg { width: 26px; height: 26px; flex: 0 0 auto; }
+  .lp-logo b { font-weight: 800; }
+  .lp-nav .nav-cta { border: 1.5px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); color: #fff;
+    border-radius: 999px; padding: 9px 18px; font-weight: 700; font-size: .9rem; cursor: pointer; font-family: inherit; }
+  .lp-nav .nav-cta:active { transform: scale(.96); }
+
+  .lp-wrap { width: 100%; max-width: 980px; margin: 0 auto; padding: 0 20px; }
+
+  /* hero */
+  .lp-hero { text-align: center; padding: 40px 0 18px; position: relative; }
+  .lp-badge { display: inline-flex; align-items: center; gap: 7px; font-size: .76rem; font-weight: 700;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); padding: 6px 13px; border-radius: 999px; margin-bottom: 20px; }
+  .lp-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--m); box-shadow: 0 0 10px var(--m); }
+  .lp-hero h1 { font-size: clamp(2rem, 8vw, 3.4rem); line-height: 1.08; font-weight: 800; letter-spacing: -1px; margin: 0 auto; max-width: 14ch; }
+  .lp-hero h1 .grad { background: linear-gradient(100deg, var(--m), var(--a) 55%, var(--v));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lp-hero .sub { margin: 18px auto 26px; font-size: clamp(1rem, 4vw, 1.18rem); color: rgba(255,255,255,.78); max-width: 30ch; line-height: 1.5; }
+  .lp-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .lp-btn { border: none; border-radius: 15px; padding: 16px 34px; font-weight: 800; font-size: 1.05rem; cursor: pointer; font-family: inherit;
+    background: linear-gradient(100deg, var(--m), var(--v)); color: #fff; box-shadow: 0 14px 40px rgba(124,77,255,.5); transition: transform .15s, box-shadow .15s; }
+  .lp-btn:hover { transform: translateY(-2px); box-shadow: 0 18px 46px rgba(255,77,157,.5); }
+  .lp-btn:active { transform: scale(.97); }
+  .lp-ghostlink { color: rgba(255,255,255,.8); text-decoration: underline; font-size: .9rem; cursor: pointer; background: none; border: none; font-family: inherit; }
+  .lp-trust { margin-top: 16px; font-size: .8rem; color: rgba(255,255,255,.55); display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .lp-trust span { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* phone mockup con demo que se pinta sola */
+  .lp-stage { position: relative; margin: 34px auto 6px; width: 230px; }
+  .lp-phone { position: relative; width: 230px; height: 466px; margin: 0 auto; border-radius: 38px; padding: 11px;
+    background: linear-gradient(160deg, #2c2350, #171030); box-shadow: 0 30px 70px rgba(0,0,0,.55), inset 0 0 0 1.5px rgba(255,255,255,.08); }
+  .lp-notch { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 92px; height: 20px; background: #0c0820; border-radius: 0 0 14px 14px; z-index: 3; }
+  .lp-screen { width: 100%; height: 100%; border-radius: 28px; overflow: hidden; background: #fff; display: block; }
+  .lp-screen svg { display: block; width: 100%; height: 100%; }
+  .lp-dot { position: absolute; border-radius: 50%; filter: blur(.3px); box-shadow: 0 6px 18px rgba(0,0,0,.3); animation: lpFloat 6s ease-in-out infinite; }
+  @keyframes lpFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
+
+  /* secciones */
+  .lp-section { padding: 46px 0; }
+  .lp-eyebrow { text-align: center; font-size: .8rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--a); margin-bottom: 8px; }
+  .lp-h2 { text-align: center; font-size: clamp(1.5rem, 6vw, 2.2rem); font-weight: 800; letter-spacing: -.5px; margin: 0 auto 30px; max-width: 18ch; }
+
+  /* reveal-on-scroll; si NO hay JS, todo se muestra (no se oculta nunca) */
+  .reveal { transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+  .js .reveal:not(.in) { opacity: 0; transform: translateY(28px); }
+
+  /* cómo funciona */
+  .lp-steps { display: grid; gap: 16px; }
+  .lp-step { display: flex; gap: 16px; align-items: flex-start; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 18px; padding: 18px; }
+  .lp-step .num { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 13px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 1.2rem; color: #fff; background: linear-gradient(140deg, var(--m), var(--v)); box-shadow: 0 8px 20px rgba(124,77,255,.4); }
+  .lp-step h3 { font-size: 1.05rem; margin-bottom: 3px; }
+  .lp-step p { font-size: .9rem; color: rgba(255,255,255,.7); line-height: 1.45; }
+
+  /* features */
+  .lp-feats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .lp-feat { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 18px; padding: 18px; }
+  .lp-feat .ic { font-size: 1.7rem; display: block; margin-bottom: 10px; }
+  .lp-feat b { display: block; font-size: 1rem; margin-bottom: 5px; }
+  .lp-feat small { font-size: .82rem; color: rgba(255,255,255,.68); line-height: 1.45; }
+
+  /* pricing */
+  .lp-prices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; max-width: 520px; margin: 0 auto; }
+  .lp-price { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 20px; padding: 22px 18px; text-align: center; position: relative; }
+  .lp-price.hl { border-color: var(--a); background: rgba(255,179,71,.1); }
+  .lp-price .tag { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); background: var(--a); color: #3a2600; font-size: .68rem; font-weight: 800; padding: 4px 11px; border-radius: 999px; }
+  .lp-price .name { font-weight: 800; font-size: 1.05rem; }
+  .lp-price .amt { font-size: 2rem; font-weight: 800; margin: 4px 0 2px; }
+  .lp-price .per { font-size: .75rem; color: rgba(255,255,255,.6); }
+  .lp-price ul { list-style: none; padding: 0; margin: 14px 0 0; text-align: left; }
+  .lp-price li { font-size: .85rem; padding: 5px 0 5px 22px; position: relative; color: rgba(255,255,255,.82); }
+  .lp-price li::before { content: '✓'; position: absolute; left: 0; color: #46d39a; font-weight: 800; }
+
+  /* CTA band + footer */
+  .lp-cta-band { text-align: center; background: linear-gradient(120deg, rgba(255,77,157,.18), rgba(124,77,255,.22));
+    border: 1px solid rgba(255,255,255,.12); border-radius: 26px; padding: 38px 22px; margin: 10px 0; }
+  .lp-cta-band h2 { font-size: clamp(1.5rem,6vw,2.2rem); font-weight: 800; letter-spacing: -.5px; }
+  .lp-cta-band p { color: rgba(255,255,255,.75); margin: 10px 0 22px; }
+  .lp-foot { text-align: center; padding: 28px 20px calc(26px + env(safe-area-inset-bottom)); font-size: .8rem; color: rgba(255,255,255,.55); border-top: 1px solid rgba(255,255,255,.08); }
+  .lp-foot a { color: rgba(255,255,255,.8); cursor: pointer; }
+  .lp-foot .brand { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; color: #fff; margin-bottom: 10px; }
+  .lp-foot .brand svg { width: 22px; height: 22px; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .lp-dot { animation: none; }
+  }
 
   /* ===== Auth ===== */
   #auth-view { flex: 1; display: none; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea, #764ba2); padding: 20px; overflow-y: auto; }
@@ -333,50 +402,98 @@
 </head>
 <body>
 
-  <!-- ===== Landing (pública) ===== -->
+  <!-- ===== Landing premium (Color Memories) ===== -->
   <div id="landing-view">
-    <nav class="land-nav">
-      <span class="land-logo">🎨 Andy Color</span>
-      <button id="landing-login">Entrar</button>
+    <div class="lp-progress" id="lp-progress"></div>
+
+    <nav class="lp-nav">
+      <span class="lp-logo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path fill="url(#hA)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
+        <b>Color Memories</b>
+      </span>
+      <button class="nav-cta" id="landing-login">Entrar</button>
     </nav>
-    <header class="hero">
-      <h1>Tus fotos, hechas pintar por números</h1>
-      <p>Sube cualquier foto y conviértela en un cuadro numerado. Pinta tocando, relájate y comparte el timelapse de tu obra.</p>
-      <button class="cta" id="landing-cta">Empezar gratis</button>
-      <a class="guest-link" id="landing-guest">Probar sin cuenta (solo en este dispositivo)</a>
-      <div class="demo-pair">
-        <div class="demo-photo"></div>
-        <span class="demo-arrow">➜</span>
-        <div class="demo-cbn">
-          <span class="f1">1</span><span class="f1">1</span><span>1</span><span class="f2">2</span>
-          <span>1</span><span class="f1">1</span><span>1</span><span>2</span>
-          <span class="f3">3</span><span>3</span><span class="f1">1</span><span>1</span>
-          <span class="f3">3</span><span class="f3">3</span><span>3</span><span>3</span>
+
+    <div class="lp-wrap">
+      <header class="lp-hero">
+        <span class="lp-badge"><span class="dot"></span> Pinta tus recuerdos</span>
+        <h1>Convierte tus fotos en <span class="grad">cuadros para pintar</span></h1>
+        <p class="sub">Sube una foto, píntala por números y revive ese momento color a color. Al terminar, comparte el timelapse de tu obra.</p>
+        <div class="lp-actions">
+          <button class="lp-btn" id="landing-cta">Empezar gratis</button>
+          <button class="lp-ghostlink" id="landing-guest">o pruébalo sin cuenta</button>
         </div>
+        <div class="lp-trust">
+          <span>✨ Gratis para empezar</span><span>🚫 Sin tarjeta</span><span>📱 Funciona en el móvil</span>
+        </div>
+
+        <div class="lp-stage">
+          <span class="lp-dot" style="width:26px;height:26px;background:#ff4d9d;top:34px;left:-2px;animation-delay:.0s"></span>
+          <span class="lp-dot" style="width:18px;height:18px;background:#ffb347;top:120px;right:-6px;animation-delay:.8s"></span>
+          <span class="lp-dot" style="width:22px;height:22px;background:#46d39a;bottom:90px;left:-10px;animation-delay:1.4s"></span>
+          <span class="lp-dot" style="width:14px;height:14px;background:#4aa3ff;bottom:40px;right:2px;animation-delay:2s"></span>
+          <div class="lp-phone">
+            <div class="lp-notch"></div>
+            <div class="lp-screen" id="lp-demo"></div>
+          </div>
+        </div>
+      </header>
+
+      <section class="lp-section">
+        <div class="lp-eyebrow reveal">Así de fácil</div>
+        <h2 class="lp-h2 reveal">En tres pasos tienes tu obra</h2>
+        <div class="lp-steps">
+          <div class="lp-step reveal"><div class="num">1</div><div><h3>Sube tu foto</h3><p>Elige una foto de tu galería o hazla en el momento. La convertimos en un cuadro numerado al instante.</p></div></div>
+          <div class="lp-step reveal"><div class="num">2</div><div><h3>Pinta por números</h3><p>Toca las zonas con el número de cada color. Relájate y mira cómo tu recuerdo cobra vida.</p></div></div>
+          <div class="lp-step reveal"><div class="num">3</div><div><h3>Comparte tu timelapse</h3><p>Al terminar, descarga tu obra o comparte el vídeo de cómo se pintó sola, paso a paso.</p></div></div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="lp-eyebrow reveal">Por qué te va a encantar</div>
+        <h2 class="lp-h2 reveal">Hecho para disfrutar</h2>
+        <div class="lp-feats">
+          <div class="lp-feat reveal"><span class="ic">📷</span><b>Tus propias fotos</b><small>Cada cuadro es único: tu familia, tu mascota, tu último viaje.</small></div>
+          <div class="lp-feat reveal"><span class="ic">🧘</span><b>Pinta y relájate</b><small>Un toque, un color. La forma perfecta de desconectar.</small></div>
+          <div class="lp-feat reveal"><span class="ic">🎬</span><b>Timelapse final</b><small>Mira tu obra pintarse sola y compártela en un toque.</small></div>
+          <div class="lp-feat reveal"><span class="ic">📱</span><b>Llévalo contigo</b><small>Instálalo como app y sigue justo donde lo dejaste.</small></div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="lp-eyebrow reveal">Precios sencillos</div>
+        <h2 class="lp-h2 reveal">Empieza gratis</h2>
+        <div class="lp-prices">
+          <div class="lp-price reveal">
+            <div class="name">Gratis</div>
+            <div class="amt">€0</div><div class="per">para siempre</div>
+            <ul><li>Crea y pinta sin límite</li><li>Timelapse y descargas</li><li>Con anuncios</li></ul>
+          </div>
+          <div class="lp-price hl reveal">
+            <div class="tag">SIN ANUNCIOS</div>
+            <div class="name">Plus</div>
+            <div class="amt">€5</div><div class="per">pago único</div>
+            <ul><li>Todo lo de Gratis</li><li>Adiós a los anuncios</li><li>Pistas ilimitadas</li></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="lp-cta-band reveal">
+          <h2>Tu próxima obra empieza con una foto</h2>
+          <p>Gratis, en tu navegador, sin instalar nada.</p>
+          <button class="lp-btn" id="landing-cta2">Crear mi primer cuadro</button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="lp-foot">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="hB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d9d"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path fill="url(#hB)" d="M12 21.3S3.4 16 1.7 9.9C.6 6 3 2.9 6.2 3.3c2 .25 3.3 1.6 4 2.9.7-1.3 2-2.65 4-2.9C17.4 2.9 19.8 6 18.7 9.9 17 16 12 21.3 12 21.3z"/></svg>
+        Color Memories
       </div>
-    </header>
-    <section class="feats">
-      <div class="feat"><span class="ic">📷</span><b>Tus propias fotos</b><small>Cada cuadro es único: tu familia, tu mascota, tu viaje.</small></div>
-      <div class="feat"><span class="ic">🧘</span><b>Pinta y relájate</b><small>Toca las zonas con el número del color. Sin complicaciones.</small></div>
-      <div class="feat"><span class="ic">🎬</span><b>Timelapse final</b><small>Mira tu obra pintarse sola y compártela en un toque.</small></div>
-      <div class="feat"><span class="ic">📱</span><b>En tu móvil</b><small>Instálala como app y sigue donde lo dejaste.</small></div>
-    </section>
-    <section class="how">
-      <h2>Cómo funciona</h2>
-      <div class="steps">
-        <div class="step"><span class="n">1</span><br>Sube una foto desde tu galería o cámara.</div>
-        <div class="step"><span class="n">2</span><br>Pinta por números: un color cada vez.</div>
-        <div class="step"><span class="n">3</span><br>Descarga tu obra o comparte el timelapse.</div>
-      </div>
-    </section>
-    <section class="prices">
-      <h2>Precios</h2>
-      <div class="price-cards">
-        <div class="price"><b>Gratis</b><div class="amt">€0</div><ul><li>Crea y pinta sin límite</li><li>Con anuncios</li></ul></div>
-        <div class="price hl"><b>Plus</b><div class="amt">€5</div><ul><li>Sin anuncios</li><li>Pago único</li></ul></div>
-      </div>
-    </section>
-    <footer class="land-foot">© 2026 Andy Color · <a href="/privacy" target="_blank">Privacidad</a> · <a href="/terms" target="_blank">Términos</a> · <a id="land-cookies">Cookies</a></footer>
+      © 2026 · <a href="/privacy" target="_blank">Privacidad</a> · <a href="/terms" target="_blank">Términos</a> · <a id="land-cookies">Cookies</a>
+    </footer>
   </div>
 
   <!-- ===== Login / registro ===== -->
@@ -530,6 +647,7 @@
   <script src="js/auth.js"></script>
   <script src="js/membership.js"></script>
   <script src="js/consent.js"></script>
+  <script src="js/landing.js"></script>
   <script src="js/ads.js"></script>
   <script src="js/creations.js"></script>
   <script src="js/finale.js"></script>
