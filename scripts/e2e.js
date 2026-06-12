@@ -165,7 +165,7 @@ const visible = (page, sel) => page.evaluate((s) => {
     ok(await visible(page, '#gallery-view'), 'desde el final se vuelve a la galería');
     const cardInfo = await page.evaluate(() => {
       const cards = document.querySelectorAll('.gal-card');
-      return { n: cards.length, done: !!document.querySelector('.gal-card .done') };
+      return { n: cards.length, done: !!document.querySelector('.gal-card.done .badge-done') };
     });
     ok(cardInfo.n === 1, 'la creación queda guardada en la galería');
     ok(cardInfo.done, 'la tarjeta marca la creación como completada');
@@ -174,7 +174,29 @@ const visible = (page, sel) => page.evaluate((s) => {
     await sleep(900);
     ok((await page.evaluate(() => document.querySelectorAll('.gal-card').length)) === 1,
       'tras recargar, la creación sigue ahí (IndexedDB)');
+    // sheet de opciones de la creación terminada + comparador
+    await page.evaluate(() => document.querySelector('.gal-card.done').click());
+    await sleep(500);
+    ok(await visible(page, '.sheet-thumb'), 'tocar una creación terminada abre el sheet de opciones');
+    await page.evaluate(() => document.querySelector('[data-a="compare"]').click());
+    await sleep(900);
+    ok(await visible(page, '#cmp-stage'), 'el comparador antes/después se abre');
+    ok(await page.evaluate(() => !!document.querySelector('.cmp-chip[data-l="orig"]')),
+      'el comparador ofrece la foto original (guardada en local)');
     await gameCtx.close();
+  }
+
+  // ----------------------------------------- S8 · selector de dificultad
+  console.log('S8 · Selector de dificultad');
+  {
+    const { ctx, page } = await newPage(browser, { andycolor_consent: CONSENT, andycolor_guest: '1', andycolor_tutorial_done: '1' });
+    await page.evaluate(() => SvgGame.showUpload());
+    await sleep(300);
+    ok(await visible(page, '#diff-select'), 'la pantalla de subida muestra el selector de dificultad');
+    ok((await page.evaluate(() => document.querySelectorAll('.diff').length)) === 3, 'hay 3 niveles (fácil/medio/difícil)');
+    await page.evaluate(() => document.querySelector('.diff[data-diff="hard"]').click());
+    ok(await page.evaluate(() => SvgGame.difficulty === 'hard'), 'elegir un nivel actualiza la dificultad');
+    await ctx.close();
   }
 
   // -------------------------------------------------- S6 · Plus: sin anuncios

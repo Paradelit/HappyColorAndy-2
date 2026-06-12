@@ -70,16 +70,24 @@
   .btn-new:active { transform: scale(.96); }
   .icon-btn { width: 40px; height: 40px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(255,255,255,.08); color: #fff; cursor: pointer; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; }
   .icon-btn:active { transform: scale(.94); }
-  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; padding: 14px 16px 28px; }
-  .gal-card { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.2); cursor: pointer; position: relative; }
+  #gal-grid { display: flex; flex-direction: column; padding: 6px 16px 28px; }
+  .gal-section { margin-top: 14px; }
+  .gal-sec-title { color: rgba(255,255,255,.92); font-size: .82rem; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; margin: 4px 2px 12px; display: flex; align-items: center; gap: 8px; }
+  .gal-sec-title span { background: rgba(255,255,255,.16); border-radius: 999px; font-size: .72rem; padding: 1px 8px; font-weight: 700; }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; }
+  .gal-card { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 22px rgba(0,0,0,.28); cursor: pointer; position: relative; transition: transform .12s; }
   .gal-card:active { transform: scale(.97); }
-  .gal-card .thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #eee; }
-  .gal-card .meta { padding: 8px 10px; }
-  .gal-card .bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
-  .gal-card .bar > div { height: 100%; background: #d63384; }
-  .gal-card .pct { font-size: .72rem; color: #6a6a72; margin-top: 4px; display: flex; justify-content: space-between; }
-  .gal-card .done { color: #4CAF50; font-weight: 700; }
-  .gal-card .del { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: .9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .gal-card .thumb-wrap { position: relative; aspect-ratio: 1; background: #f0f0f4; }
+  .gal-card .thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gal-card .badge-done { position: absolute; top: 8px; left: 8px; width: 26px; height: 26px; border-radius: 50%; background: #2ec27e; color: #fff; font-size: .85rem; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  .gal-card .badge-diff { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: .66rem; font-weight: 800; padding: 3px 8px; border-radius: 999px; }
+  .gal-card .meta { padding: 9px 11px; }
+  .gal-card .bar { height: 6px; background: #ececf2; border-radius: 3px; overflow: hidden; }
+  .gal-card .bar > div { height: 100%; background: linear-gradient(90deg, #ff4d9d, #7c4dff); }
+  .gal-card .pct { font-size: .74rem; color: #6a6a72; margin-top: 5px; font-weight: 700; display: block; }
+  .gal-card .done-label { font-size: .82rem; color: #2ec27e; font-weight: 800; }
+  .gal-card .del { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border: none; border-radius: 50%; background: rgba(0,0,0,.5); color: #fff; font-size: .9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .sheet-thumb { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 12px; margin: 6px 0 14px; }
   .gal-empty { color: #fff; text-align: center; margin: auto; opacity: .85; line-height: 1.6; font-size: .92rem; }
   .gal-empty .empty-ic { width: 56px; height: 56px; opacity: .5; margin-bottom: 12px; }
   .card h1 { font-size: 1.4rem; color: #333; margin-bottom: 4px; }
@@ -118,6 +126,22 @@
   .ai-toggle span { display: flex; flex-direction: column; font-size: .85rem; color: #553; }
   .ai-toggle small { color: #998; font-size: .72rem; margin-top: 2px; }
   .mode-toggle { display: flex; gap: 8px; margin: -4px 0 14px; }
+
+  /* selector de dificultad */
+  .diff-select { margin: 2px 0 16px; }
+  .diff-label { font-size: .82rem; font-weight: 700; color: #555; margin-bottom: 8px; }
+  .diff { display: block; width: 100%; text-align: left; border: 2px solid #e7e7ee; background: #fff; border-radius: 12px; padding: 11px 14px; margin-bottom: 8px; cursor: pointer; font-family: inherit; transition: .12s; }
+  .diff:last-child { margin-bottom: 0; }
+  .diff-head { display: flex; align-items: center; justify-content: space-between; }
+  .diff b { font-size: .95rem; color: #333; }
+  .diff small { display: block; font-size: .76rem; color: #999; margin-top: 2px; }
+  .diff .dots { display: flex; gap: 4px; }
+  .diff .dots i { width: 7px; height: 7px; border-radius: 50%; background: #dcdce4; }
+  .diff .dots i.on { background: #b9a9e6; }
+  .diff.selected { border-color: #764ba2; background: #f6f3ff; }
+  .diff.selected b { color: #764ba2; }
+  .diff.selected .dots i.on { background: #7c4dff; }
+  .diff:active { transform: scale(.99); }
   .mode { flex: 1; border: 2px solid #e2e2ea; background: #fff; border-radius: 10px; padding: 8px 4px; font-size: .82rem; font-weight: 700; color: #777; cursor: pointer; }
   .mode small { display: block; font-weight: 400; font-size: .64rem; color: #aaa; margin-top: 2px; }
   .mode.selected { border-color: #764ba2; background: #f4f1ff; color: #764ba2; }
@@ -219,7 +243,7 @@
   .finale-actions button { border: none; border-radius: 12px; padding: 12px 10px; font-weight: 700; font-size: .95rem; background: #fff; color: #333; cursor: pointer; }
   .finale-actions button:active { transform: scale(.96); }
   .finale-actions button:disabled { opacity: .55; }
-  #fin-share { background: #d63384; color: #fff; }
+  #fin-share { background: #d63384; color: #fff; grid-column: 1 / -1; }
   #victory button.ghost { margin-top: 14px; background: transparent; color: #bbb; border: none; font-weight: 600; cursor: pointer; }
 
   /* ===== Membresía: chip de plan ===== */
@@ -264,6 +288,22 @@
   .ad-skip { border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; background: #fff; color: #222; cursor: pointer; }
   .ad-skip:disabled { background: #33333f; color: #888; cursor: default; }
   .ad-foot { margin-top: 14px; font-size: .72rem; color: #777; }
+
+  /* ===== Comparador (slider antes/después) ===== */
+  .cmp { position: fixed; inset: 0; z-index: 82; background: rgba(12,8,28,.96); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px; }
+  .cmp h2 { color: #fff; font-size: 1.2rem; margin-bottom: 14px; }
+  .cmp-x { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 16px; width: 36px; height: 36px; border: none; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; font-size: 1rem; cursor: pointer; }
+  .cmp-stage { position: relative; width: 100%; max-width: 380px; aspect-ratio: 1; border-radius: 16px; overflow: hidden; box-shadow: 0 16px 50px rgba(0,0,0,.55); touch-action: none; user-select: none; -webkit-user-select: none; cursor: ew-resize; background: #fff; }
+  .cmp-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+  .cmp-clip { position: absolute; inset: 0; clip-path: inset(0 50% 0 0); }
+  .cmp-divider { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; background: #fff; transform: translateX(-50%); box-shadow: 0 0 8px rgba(0,0,0,.45); pointer-events: none; }
+  .cmp-knob { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 40px; height: 40px; border-radius: 50%; background: #fff; color: #555; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 2px 10px rgba(0,0,0,.45); }
+  .cmp-badge { position: absolute; bottom: 12px; font-size: .72rem; font-weight: 800; color: #fff; background: rgba(0,0,0,.5); padding: 5px 10px; border-radius: 999px; pointer-events: none; }
+  .cmp-badge.bl { left: 12px; } .cmp-badge.br { right: 12px; }
+  .cmp-chips { display: flex; gap: 8px; margin-top: 18px; }
+  .cmp-chip { border: 1.5px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px; padding: 9px 16px; font-weight: 700; font-size: .85rem; cursor: pointer; font-family: inherit; }
+  .cmp-chip.on { background: #fff; color: #5a3d8a; border-color: #fff; }
+  .cmp-hint { color: rgba(255,255,255,.6); font-size: .78rem; margin-top: 14px; }
 
   /* ===== Toast ===== */
   .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); z-index: 90; background: #222; color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: .9rem; opacity: 0; transition: .3s; pointer-events: none; }
@@ -587,7 +627,7 @@
         <button class="btn-new" id="btn-new">+ Nueva</button>
       </div>
     </div>
-    <div id="gal-grid" class="gal-grid"></div>
+    <div id="gal-grid"></div>
     <div id="gal-empty" class="gal-empty" hidden>
       <svg class="empty-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
       Aún no tienes creaciones.<br>Pulsa <b>+ Nueva</b> para convertir una foto.
@@ -617,6 +657,22 @@
       <div class="mode-toggle" id="mode-toggle" hidden>
         <button type="button" class="mode selected" data-mode="multi">Multitono<small>varios tonos por zona</small></button>
         <button type="button" class="mode" data-mode="flat">Colores planos<small>un color por zona</small></button>
+      </div>
+
+      <div class="diff-select" id="diff-select">
+        <div class="diff-label">Dificultad</div>
+        <button type="button" class="diff" data-diff="easy">
+          <span class="diff-head"><b>Fácil</b><span class="dots"><i class="on"></i><i></i><i></i></span></span>
+          <small>Áreas grandes, ideal para empezar</small>
+        </button>
+        <button type="button" class="diff selected" data-diff="medium">
+          <span class="diff-head"><b>Medio</b><span class="dots"><i class="on"></i><i class="on"></i><i></i></span></span>
+          <small>Detalle y dificultad equilibrados</small>
+        </button>
+        <button type="button" class="diff" data-diff="hard">
+          <span class="diff-head"><b>Difícil</b><span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></span></span>
+          <small>Más detalle, más reto al pintar</small>
+        </button>
       </div>
 
       <button class="btn" id="generate" disabled>Generar</button>
@@ -666,6 +722,7 @@
       <div class="finale-stage"><canvas id="finale-canvas"></canvas></div>
       <div class="finale-actions">
         <button id="fin-replay">🔁 Repetir</button>
+        <button id="fin-compare">⇆ Comparar</button>
         <button id="fin-download">⬇️ Imagen</button>
         <button id="fin-video">🎬 Vídeo</button>
         <button id="fin-share">🔗 Compartir</button>

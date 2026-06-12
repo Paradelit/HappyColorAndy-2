@@ -19,6 +19,7 @@ const CM_ICONS = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
   image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+  maximize: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
   chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
 };
 
@@ -334,6 +335,70 @@ const SvgGame = {
     if (fl) fl.onclick = () => this.openForgotModal();
   },
 
+  // ---------- comparador (foto original / sin pintar / pintada) ----------
+  async openCompare(creation) {
+    if (!creation || !creation.doc) return;
+    const doc = creation.doc;
+    const allIds = doc.regions.map(r => r.id);
+    let painted = '', line = '';
+    try { painted = await renderStateThumb(doc, allIds, 1000); } catch (e) { /* noop */ }
+    try { line = await renderStateThumb(doc, [], 1000); } catch (e) { /* noop */ }
+    const orig = creation.original || '';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'cmp';
+    wrap.innerHTML =
+      `<button class="cmp-x" aria-label="Cerrar">✕</button>
+       <h2>Tu obra</h2>
+       <div class="cmp-stage" id="cmp-stage">
+         <img class="cmp-img" id="cmp-right" alt="Pintada">
+         <div class="cmp-clip" id="cmp-clip"><img class="cmp-img" id="cmp-left" alt=""></div>
+         <div class="cmp-divider" id="cmp-div"><span class="cmp-knob">⇆</span></div>
+         <span class="cmp-badge bl" id="cmp-bl"></span>
+         <span class="cmp-badge br">Pintada</span>
+       </div>
+       <div class="cmp-chips" id="cmp-chips">
+         ${orig ? '<button class="cmp-chip" data-l="orig">Foto original</button>' : ''}
+         <button class="cmp-chip on" data-l="line">Sin pintar</button>
+       </div>
+       <div class="cmp-hint">Arrastra para comparar</div>`;
+    document.body.appendChild(wrap);
+
+    const rightImg = wrap.querySelector('#cmp-right');
+    const leftImg = wrap.querySelector('#cmp-left');
+    const bl = wrap.querySelector('#cmp-bl');
+    rightImg.src = painted;
+    const setLeft = (which) => {
+      if (which === 'orig' && orig) { leftImg.src = orig; bl.textContent = 'Foto original'; }
+      else { leftImg.src = line; bl.textContent = 'Sin pintar'; }
+      wrap.querySelectorAll('.cmp-chip').forEach(c => c.classList.toggle('on', c.dataset.l === which));
+    };
+    setLeft('line');
+    wrap.querySelectorAll('.cmp-chip').forEach(c => { c.onclick = () => setLeft(c.dataset.l); });
+
+    const stage = wrap.querySelector('#cmp-stage');
+    const clip = wrap.querySelector('#cmp-clip');
+    const div = wrap.querySelector('#cmp-div');
+    const setPos = (pct) => {
+      pct = Math.max(3, Math.min(97, pct));
+      clip.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+      div.style.left = pct + '%';
+    };
+    setPos(50);
+    const move = (e) => {
+      const r = stage.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      setPos((x / r.width) * 100);
+    };
+    let dragging = false;
+    stage.addEventListener('pointerdown', (e) => { dragging = true; move(e); });
+    window.addEventListener('pointermove', (e) => { if (dragging) move(e); });
+    window.addEventListener('pointerup', () => { dragging = false; });
+
+    const close = () => wrap.remove();
+    wrap.querySelector('.cmp-x').onclick = close;
+  },
+
   // ---------- recuperación de contraseña ----------
   openForgotModal() {
     const prefill = document.getElementById('auth-email').value.trim();
@@ -485,34 +550,83 @@ const SvgGame = {
     try { items = await Creations.list(); } catch (e) { items = []; }
     this.ui.galEmpty.hidden = items.length > 0;
     this.ui.galGrid.innerHTML = '';
-    items.forEach(c => {
-      const card = document.createElement('div');
-      card.className = 'gal-card';
-      const done = c.progress >= 100;
-      const pct = c.progress || 0;
-      card.setAttribute('role', 'button');
-      card.setAttribute('tabindex', '0');
-      card.setAttribute('aria-label', `Creación ${done ? 'completada' : pct + ' por ciento'}, abrir`);
-      card.innerHTML =
-        `<img class="thumb" src="${c.thumb || ''}" alt="">` +
-        `<button class="del" title="Borrar" aria-label="Borrar creación">✕</button>` +
-        `<div class="meta"><div class="bar"><div style="width:${pct}%"></div></div>` +
-        `<div class="pct"><span>${done ? '<span class=\"done\">✓ Completo</span>' : pct + '%'}</span></div></div>`;
-      const open = () => this.resumeCreation(c.id);
-      card.querySelector('.thumb').onclick = open;
-      card.querySelector('.meta').onclick = open;
-      card.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-      });
-      card.querySelector('.del').onclick = async (e) => {
-        e.stopPropagation();
-        if (confirm('¿Borrar esta creación?')) {
-          await Creations.remove(c.id);
-          Auth.deleteCreation(c.id);
-          this.renderGallery();
-        }
+    const inProgress = items.filter(c => (c.progress || 0) < 100);
+    const done = items.filter(c => (c.progress || 0) >= 100);
+    const section = (title, list) => {
+      if (!list.length) return;
+      const sec = document.createElement('div');
+      sec.className = 'gal-section';
+      sec.innerHTML = `<h2 class="gal-sec-title">${title} <span>${list.length}</span></h2><div class="gal-grid"></div>`;
+      const grid = sec.querySelector('.gal-grid');
+      list.forEach(c => grid.appendChild(this._galCard(c)));
+      this.ui.galGrid.appendChild(sec);
+    };
+    section('En curso', inProgress);
+    section('Terminadas', done);
+  },
+
+  _galCard(c) {
+    const done = (c.progress || 0) >= 100;
+    const pct = c.progress || 0;
+    const diff = { easy: 'Fácil', medium: 'Medio', hard: 'Difícil' }[c.difficulty] || '';
+    const card = document.createElement('div');
+    card.className = 'gal-card' + (done ? ' done' : '');
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', `Creación ${done ? 'completada' : pct + ' por ciento'}`);
+    card.innerHTML =
+      `<div class="thumb-wrap"><img class="thumb" src="${c.thumb || ''}" alt="" loading="lazy">` +
+      (done ? '<span class="badge-done">✓</span>' : '') +
+      (diff ? `<span class="badge-diff">${diff}</span>` : '') +
+      `<button class="del" aria-label="Borrar creación">✕</button></div>` +
+      `<div class="meta">` +
+      (done ? '<span class="done-label">Completa</span>'
+            : `<div class="bar"><div style="width:${pct}%"></div></div><span class="pct">${pct}%</span>`) +
+      `</div>`;
+    const open = () => (done ? this.openCreationSheet(c) : this.resumeCreation(c.id));
+    card.onclick = open;
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+    card.querySelector('.del').onclick = async (e) => {
+      e.stopPropagation();
+      if (confirm('¿Borrar esta creación?')) {
+        await Creations.remove(c.id);
+        Auth.deleteCreation(c.id);
+        this.renderGallery();
+      }
+    };
+    return card;
+  },
+
+  // Opciones de una creación terminada (comparar / timelapse+compartir / abrir).
+  openCreationSheet(c) {
+    const wrap = document.createElement('div');
+    wrap.className = 'paywall';
+    const row = (a, icon, label) => `<button class="acct-row" data-a="${a}">${CM_ICONS[icon]}<span>${label}</span>${CM_ICONS.chev}</button>`;
+    wrap.innerHTML =
+      `<div class="paywall-card">
+        <button class="paywall-x" aria-label="Cerrar">✕</button>
+        <h2>Tu obra</h2>
+        <img class="sheet-thumb" src="${c.thumb || ''}" alt="">
+        <div class="acct-list">
+          ${row('compare', 'image', 'Comparar antes / después')}
+          ${row('finale', 'play', 'Ver timelapse y compartir')}
+          ${row('open', 'maximize', 'Abrir el cuadro')}
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.querySelector('.paywall-x').onclick = close;
+    wrap.onclick = (e) => { if (e.target === wrap) close(); };
+    wrap.querySelectorAll('[data-a]').forEach(b => {
+      b.onclick = async () => {
+        const a = b.getAttribute('data-a');
+        close();
+        if (a === 'compare') { this.openCompare(c); }
+        else if (a === 'open') { this.resumeCreation(c.id); }
+        else if (a === 'finale') { await this.resumeCreation(c.id); this.openFinale(true); }
       };
-      this.ui.galGrid.appendChild(card);
     });
   },
 
@@ -548,6 +662,15 @@ const SvgGame = {
         this.multitone = (b.dataset.mode === 'multi');
       };
     });
+    // dificultad (fácil / medio / difícil)
+    this.difficulty = 'medium';
+    document.querySelectorAll('.diff').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('.diff').forEach(x => x.classList.remove('selected'));
+        b.classList.add('selected');
+        this.difficulty = b.dataset.diff;
+      };
+    });
     // v1 sin modo IA: el toggle queda oculto (volverá con "imagina tu foto" + IA)
     this.ui.aiToggle.hidden = true;
     this.ui.modeToggle.hidden = false;   // multitono / colores planos, siempre
@@ -570,6 +693,11 @@ const SvgGame = {
     const fd = new FormData();
     fd.append('file', f);
     fd.append('multitone', this.multitone ? 'true' : 'false');
+    fd.append('difficulty', this.difficulty || 'medium');
+    // foto original reducida, SOLO para el comparador (se guarda en local, no se
+    // sube al servidor: ver Auth.pushCreation).
+    let original = '';
+    try { original = await makeThumb(f, 1000); } catch (_) { /* sin original */ }
 
     this.ui.err.textContent = '';
     this.ui.loadingText.textContent = 'Generando tu obra…';
@@ -593,6 +721,7 @@ const SvgGame = {
       this.creation = {
         id: Creations.newId(), createdAt: Date.now(), updatedAt: Date.now(),
         thumb, doc, paintedIds: [], total: doc.regions.length, progress: 0,
+        original, difficulty: (doc.meta && doc.meta.difficulty) || this.difficulty,
       };
       try { await Creations.put(this.creation); } catch (_) { /* cuota */ }
       Auth.pushCreation(this.creation);
@@ -1151,6 +1280,7 @@ const SvgGame = {
   bindFinale() {
     const order = () => this._order || [];
     document.getElementById('fin-replay').onclick = () => this.playFinale();
+    document.getElementById('fin-compare').onclick = () => this.openCompare(this.creation);
 
     document.getElementById('fin-download').onclick = (e) =>
       this.withBusy(e.currentTarget, '…', async () => {

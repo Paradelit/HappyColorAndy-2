@@ -245,6 +245,9 @@ const Auth = {
   _pushTimers: {},
   pushCreation(c) {
     if (!c || !this.user) return;
+    // La foto ORIGINAL no se sube al servidor (privacidad): solo vive en local.
+    const { original, ...c2 } = c;
+    c = c2;
     clearTimeout(this._pushTimers[c.id]);
     this._pushTimers[c.id] = setTimeout(() => {
       if (this.usesSupabase()) {
