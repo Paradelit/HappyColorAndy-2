@@ -39,10 +39,10 @@ def generate_color_by_number(
         file_bytes = ai_stylize(file_bytes)   # foto -> ilustracion (IA)
         stylized = True
 
-    # MISMO pipeline para ambos modos; lo unico que cambia es la entrada (foto u
-    # ilustracion IA) y de donde salen las lineas. En modo IA la entrada ya es
-    # una ilustracion limpia: NO se suaviza (para no emborronar la tinta).
-    eff_process_size = 1536
+    # En modo IA la entrada ya es una ilustracion limpia y de alta resolucion:
+    # NO se suaviza (para no emborronar la tinta) y se procesa a 1536. Para FOTOS
+    # procesamos a 1300: suficiente detalle en movil y bastante mas rapido/ligero.
+    eff_process_size = 1536 if stylized else 1300
     rgb = preprocess(file_bytes, process_size=eff_process_size, denoise=not stylized)
     h, w = rgb.shape[:2]
 
@@ -64,17 +64,20 @@ def generate_color_by_number(
         )
         line_overlay = line_overlay_path(rgb, dark_thresh=dark_thresh)
     else:
-        # Foto: sin tinta que detectar; mismas capacidades posterizando directo
-        # a los numeros, y el dibujo son las fronteras entre numeros.
+        # Foto: dos niveles -> numeros limpios (lineas) + sub-tonos finos
+        # (fidelidad). El dibujo son las fronteras entre numeros.
         region_map, n_regions, fills, groups, clusters, palette = build_photo(
-            rgb, n_numbers=ai_numbers, max_cluster_pct=max_click, multitone=multitone,
+            rgb, max_cluster_pct=max_click, multitone=multitone,
         )
         line_overlay = number_overlay_path(region_map, groups)
 
     region_area = np.bincount(region_map.ravel(), minlength=n_regions).astype(int).tolist()
     edge = boundary_edge_strength(region_map, n_regions, rgb)
 
-    paths = vectorize(region_map, n_regions, simplify_tol=simplify_tol)
+    # En foto subimos la simplificacion de los paths: payload mas ligero sin
+    # perdida visible a resolucion de movil.
+    eff_simplify = simplify_tol if stylized else max(simplify_tol, 2.2)
+    paths = vectorize(region_map, n_regions, simplify_tol=eff_simplify)
     labels = labels_for_regions(region_map, n_regions)
 
     doc = assemble(w, h, palette, groups, region_area, fills, edge, clusters, paths, labels)

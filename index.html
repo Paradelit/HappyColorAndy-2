@@ -194,9 +194,14 @@
   /* numero multitono: marca de esquina (pinta en varios tonos) */
   .color-btn.multitone::after { content: ''; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 16px 16px 0; border-color: transparent rgba(255,255,255,.85) transparent transparent; }
   .color-number { font-size: 1rem; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
-  /* animacion vanish al completar un numero */
-  @keyframes vanish { 60% { transform: scale(1.18); } 100% { transform: scale(0); opacity: 0; margin-left: -72px; } }
-  .color-btn.vanish { animation: vanish .4s ease forwards; pointer-events: none; }
+  /* vanish al completar un numero: pop con destello y sube desvaneciendose */
+  @keyframes cbtnVanish {
+    0%   { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; box-shadow: 0 3px 8px rgba(0,0,0,.15); }
+    28%  { transform: translateY(3px) scale(1.22); box-shadow: 0 0 0 7px rgba(255,255,255,.55), 0 8px 18px rgba(0,0,0,.28); }
+    100% { transform: translateY(-58px) scale(.28) rotate(-10deg); opacity: 0; box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  }
+  .color-btn.vanish { animation: cbtnVanish .55s cubic-bezier(.34,1.25,.4,1) forwards; pointer-events: none; z-index: 6; }
+  .color-btn.vanish .color-number { font-size: 1.45rem; }
 
   /* seccion avanzada (oculta por defecto) */
   .adv { margin-top: 16px; }

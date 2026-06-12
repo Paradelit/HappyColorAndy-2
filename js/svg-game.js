@@ -742,8 +742,7 @@ const SvgGame = {
       { feedback: false, animate: !!point, point }));
     if (withFeedback) {
       this.vibrate(30);
-      const color = this.clusterColor[cluster];
-      if (this.colorRemaining[color] === 0) this.onColorCompleted(color);
+      // el "completado de numero" lo gestiona updateColorBtn (robusto); aqui solo victoria
       if (this.state.paintedCount === this.state.totalRegions) this.triggerVictory();
     }
     this.saveProgress();
@@ -773,7 +772,6 @@ const SvgGame = {
 
     if (opts.feedback) {
       this.vibrate(30);
-      if (this.colorRemaining[r.color] === 0) this.onColorCompleted(r.color);
       if (this.state.paintedCount === this.state.totalRegions) this.triggerVictory();
     }
     this.saveProgress();
@@ -976,18 +974,25 @@ const SvgGame = {
     });
   },
 
+  // Fuente UNICA de verdad del estado de un numero. Si su restante llega a <=0
+  // (aunque sea por un camino que no detecto el cruce exacto), el boton se va.
+  // Asi nunca se queda un numero "pillado" al 100% en la paleta.
   updateColorBtn(i) {
     const btn = document.getElementById('cbtn-' + i);
     if (!btn) return;
     const total = this.colorTotal[i] || 1;
     const rem = this.colorRemaining[i];
-    if (rem <= 0) {
-      btn.classList.add('completed');
-      btn.classList.remove('selected');
-      btn.style.setProperty('--progress', '100%');
-    } else {
+    if (rem > 0) {
       btn.style.setProperty('--progress', `${((total - rem) / total) * 100}%`);
+      return;
     }
+    // numero completado
+    btn.style.setProperty('--progress', '100%');
+    if (btn.classList.contains('completed')) return;   // ya gestionado
+    btn.classList.add('completed');
+    btn.classList.remove('selected');
+    if (this._resuming) { btn.remove(); return; }       // sin animacion al retomar
+    this.onColorCompleted(i);                           // vibra + vanish + avanza
   },
 
   selectColor(i) {
@@ -1018,10 +1023,12 @@ const SvgGame = {
   },
 
   resumePainted(ids) {
+    this._resuming = true;   // no animar la salida de numeros ya completados
     (ids || []).forEach(id => {
       const el = this.pathEls[id], r = this.regionsById[id];
       if (el && r) this.paint(r, el, { feedback: false });
     });
+    this._resuming = false;
   },
 
   // ---------- botones de zoom ----------
@@ -1078,12 +1085,16 @@ const SvgGame = {
     }
   },
 
-  // anima la salida del numero completado y lo quita de la paleta
+  // anima la salida del numero completado (pop + sube) y lo quita de la paleta
   vanishColorBtn(index) {
     const btn = document.getElementById('cbtn-' + index);
     if (!btn || btn.classList.contains('vanish')) return;
+    const num = btn.querySelector('.color-number');
+    if (num) num.textContent = '✓';           // satisfaccion: se convierte en check
     btn.classList.add('vanish');
-    btn.addEventListener('animationend', () => btn.remove(), { once: true });
+    const done = () => { if (btn.parentNode) btn.remove(); };
+    btn.addEventListener('animationend', done, { once: true });
+    setTimeout(done, 750);                     // fallback si no llega animationend
   },
 
   updateProgress() {
