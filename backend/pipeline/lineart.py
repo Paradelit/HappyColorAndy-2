@@ -418,6 +418,18 @@ def _merge_small_numbers(adj, n, numbers, areas, min_cluster_px):
     return numbers
 
 
+# Presets de DIFICULTAD para fotos: controlan cuanto detalle/numeros tiene el
+# cuadro. 'easy' = areas grandes (pocos clics); 'hard' = mucho detalle.
+PHOTO_DIFFICULTY = {
+    "easy":   dict(n_numbers=24, fine_colors=110, min_piece_pct=0.09,
+                   min_cluster_pct=0.45, max_cluster_pct=9.0),
+    "medium": dict(n_numbers=44, fine_colors=170, min_piece_pct=0.035,
+                   min_cluster_pct=0.18, max_cluster_pct=6.0),
+    "hard":   dict(n_numbers=64, fine_colors=240, min_piece_pct=0.018,
+                   min_cluster_pct=0.09, max_cluster_pct=4.5),
+}
+
+
 def build_photo(rgb, n_numbers=44, max_cluster_pct=6.0, multitone=True,
                 multitone_spread=6.0, fine_colors=170, min_piece_pct=0.035,
                 number_clean=5, min_cluster_pct=0.18):

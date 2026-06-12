@@ -6,7 +6,8 @@ import time
 import numpy as np
 
 from .preprocess import preprocess
-from .lineart import build_lineart, build_photo, line_overlay_path, number_overlay_path, auto_dark_thresh
+from .lineart import (build_lineart, build_photo, line_overlay_path,
+                      number_overlay_path, auto_dark_thresh, PHOTO_DIFFICULTY)
 from .recolor import boundary_edge_strength
 from .vectorize import vectorize
 from .labels import labels_for_regions
@@ -25,6 +26,7 @@ def generate_color_by_number(
     stylize: bool = False,
     multitone: bool = True,
     ai_numbers: int = 60,
+    difficulty: str = "medium",
 ):
     """Ejecuta el pipeline y devuelve el dict JSON listo para el frontend.
 
@@ -65,9 +67,12 @@ def generate_color_by_number(
         line_overlay = line_overlay_path(rgb, dark_thresh=dark_thresh)
     else:
         # Foto: dos niveles -> numeros limpios (lineas) + sub-tonos finos
-        # (fidelidad). El dibujo son las fronteras entre numeros.
+        # (fidelidad). La DIFICULTAD ajusta el detalle (areas grandes vs muchas).
+        preset = dict(PHOTO_DIFFICULTY.get(difficulty, PHOTO_DIFFICULTY["medium"]))
+        if os.environ.get("LINEART_MAX_CLICK_PCT"):
+            preset["max_cluster_pct"] = max_click   # override por env si se define
         region_map, n_regions, fills, groups, clusters, palette = build_photo(
-            rgb, max_cluster_pct=max_click, multitone=multitone,
+            rgb, multitone=multitone, **preset,
         )
         line_overlay = number_overlay_path(region_map, groups)
 
@@ -86,6 +91,7 @@ def generate_color_by_number(
     doc["meta"] = {
         "n_colors": ai_numbers,
         "multitone": multitone,
+        "difficulty": difficulty,
         "mode": "lineart" if stylized else "photo-lineart",
         "simplify_tol": simplify_tol,
         "process_size": eff_process_size,

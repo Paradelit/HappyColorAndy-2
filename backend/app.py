@@ -137,6 +137,7 @@ async def generate(
     stylize: bool = Form(False),
     multitone: bool = Form(True),
     ai_numbers: int = Form(60),
+    difficulty: str = Form("medium"),
     request: Request = None,
     authorization: str = Header(default=""),
 ):
@@ -161,6 +162,7 @@ async def generate(
             stylize=bool(stylize),
             multitone=bool(multitone),
             ai_numbers=int(ai_numbers),
+            difficulty=str(difficulty),
         )
     except HTTPException:
         raise
