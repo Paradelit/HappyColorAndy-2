@@ -345,171 +345,75 @@ def _build_palette(numbers, means, centers, k, multitone, multitone_spread):
     return palette
 
 
-def _region_adjacency(region_map, n):
-    """adj[a][b] = pixeles de frontera entre las sub-regiones a y b."""
-    adj = defaultdict(lambda: defaultdict(int))
-
-    def accum(a, b):
-        m = a != b
-        if not m.any():
-            return
-        lo = np.minimum(a[m], b[m]).astype(np.int64)
-        hi = np.maximum(a[m], b[m]).astype(np.int64)
-        key, cnt = np.unique(lo * (n + 1) + hi, return_counts=True)
-        for kk, c in zip(key, cnt):
-            ra, rb = int(kk // (n + 1)), int(kk % (n + 1))
-            adj[ra][rb] += int(c)
-            adj[rb][ra] += int(c)
-
-    accum(region_map[:, :-1].ravel(), region_map[:, 1:].ravel())
-    accum(region_map[:-1, :].ravel(), region_map[1:, :].ravel())
-    return adj
-
-
-def _merge_small_numbers(adj, n, numbers, areas, min_cluster_px):
-    """Reasigna el NUMERO de los clusters (zonas contiguas del mismo numero)
-    mas pequenos que `min_cluster_px` al del cluster vecino con el que mas
-    frontera comparten. NO cambia las sub-regiones ni sus rellenos: solo limpia
-    los 'gusanos' de las zonas planas y reduce el numero de clics."""
-    numbers = list(numbers)
-
-    def clusters_of():
-        parent = list(range(n))
-
-        def find(x):
-            r = x
-            while parent[r] != r:
-                r = parent[r]
-            while parent[x] != r:
-                parent[x], x = r, parent[x]
-            return r
-        for a in range(n):
-            na = numbers[a]
-            for b in adj[a]:
-                if numbers[b] == na:
-                    ra, rb = find(a), find(b)
-                    if ra != rb:
-                        parent[ra] = rb
-        groups = defaultdict(list)
-        for i in range(n):
-            groups[find(i)].append(i)
-        return list(groups.values())
-
-    for _ in range(6):
-        changed = False
-        for ids in sorted(clusters_of(), key=lambda g: sum(int(areas[i]) for i in g)):
-            if sum(int(areas[i]) for i in ids) >= min_cluster_px:
-                continue
-            cur = numbers[ids[0]]
-            idset = set(ids)
-            border = defaultdict(int)
-            for i in ids:
-                for nb, b in adj[i].items():
-                    if nb not in idset and numbers[nb] != cur:
-                        border[numbers[nb]] += b
-            if not border:
-                continue
-            best = max(border, key=border.get)
-            for i in ids:
-                numbers[i] = best
-            changed = True
-        if not changed:
-            break
-    return numbers
-
-
-# Presets de DIFICULTAD para fotos: controlan cuanto detalle/numeros tiene el
-# cuadro. 'easy' = areas grandes (pocos clics); 'hard' = mucho detalle.
+# Presets de DIFICULTAD para fotos. Controlan cuanto detalle/numeros tiene el
+# cuadro. Mas colores (n_colors) y piezas mas pequenas (min_piece) = mas detalle
+# tanto en el DIBUJO (lineas) como en la fidelidad del resultado pintado.
+#   easy   = areas grandes, pocos clics (para empezar)
+#   hard   = mucho detalle, mas reto
 PHOTO_DIFFICULTY = {
-    "easy":   dict(n_numbers=24, fine_colors=110, min_piece_pct=0.09,
-                   min_cluster_pct=0.45, max_cluster_pct=9.0),
-    "medium": dict(n_numbers=44, fine_colors=170, min_piece_pct=0.035,
-                   min_cluster_pct=0.18, max_cluster_pct=6.0),
-    "hard":   dict(n_numbers=64, fine_colors=240, min_piece_pct=0.018,
-                   min_cluster_pct=0.09, max_cluster_pct=4.5),
+    "easy":   dict(n_colors=18, clean_radius=5, min_piece_pct=0.11, max_cluster_pct=9.0),
+    "medium": dict(n_colors=30, clean_radius=4, min_piece_pct=0.055, max_cluster_pct=6.0),
+    "hard":   dict(n_colors=46, clean_radius=3, min_piece_pct=0.028, max_cluster_pct=4.5),
 }
 
 
-def build_photo(rgb, n_numbers=44, max_cluster_pct=6.0, multitone=True,
-                multitone_spread=6.0, fine_colors=170, min_piece_pct=0.035,
-                number_clean=5, min_cluster_pct=0.18):
-    """Color-by-number FIEL para fotos (dos niveles, manteniendo SVG).
+def build_photo(rgb, n_colors=30, max_cluster_pct=6.0, multitone=True,
+                multitone_spread=8.0, clean_radius=4, min_piece_pct=0.055):
+    """Color-by-number para FOTOS.
 
-    El objetivo: que al TERMINAR de pintar, el cuadro se parezca claramente a la
-    foto original. Para eso separamos dos cosas:
+    Objetivo doble: (1) el DIBUJO sin pintar debe DELINEAR claramente la foto
+    (cara, formas, sombras), para que se pueda pintar y reconocer; (2) al
+    TERMINAR, el cuadro debe parecerse a la foto original.
 
-    - SUB-REGIONES (fidelidad): cuantizacion de color FINA (muchos tonos) ->
-      componentes conexas -> cada sub-region se pinta con su tono REAL (la media
-      de sus pixeles). Muchas sub-regiones pequenas reconstruyen los degradados y
-      el detalle, asi que el resultado final es casi la foto.
-    - NUMEROS (paleta jugable): esos tonos se agrupan en `n_numbers` colores con
-      k-means en LAB. Las LINEAS del dibujo solo se trazan entre numeros
-      distintos (no entre sub-tonos del mismo numero), asi el dibujo no se satura.
-    - Un CLIC pinta un cluster contiguo del mismo numero (con todos sus
-      sub-tonos), con tope de area para que no pinte medio cuadro.
+    Modelo (un nivel, simple y robusto):
+      - Posterizado LIMPIO a `n_colors` (k-means en LAB + filtro de mayoria que
+        quita el ruido). Las fronteras de color = las LINEAS del dibujo, y como
+        siguen el contenido de la imagen, delinean los rasgos.
+      - REGION = zona contigua del mismo color posterizado. Cada region es UNA
+        pieza con UN numero.
+      - FILL multitono = la MEDIA real de la region (su tono fiel) -> al pintar,
+        cada zona toma su color real y el conjunto se parece a la foto. FILL plano
+        = el color del numero.
+      - Un CLIC pinta un cluster contiguo del mismo numero, con tope de area.
 
     Returns: region_map, n_regions, fills, numbers, clusters, palette
     """
     h, w = rgb.shape[:2]
 
-    # 1) NUMEROS: posterizado LIMPIO a n_numbers (filtro de mayoria fuerte). Esto
-    #    define las LINEAS del dibujo -> pocas fronteras = lineas limpias, sin
-    #    "gusanos" en cielos/hierba.
-    nmap, npal = quantize(rgb, n_colors=n_numbers, clean_radius=number_clean)
-    kN = len(npal)
-    ncenters = np.array([p["rgb"] for p in npal], dtype=np.uint8)
+    # 1) Posterizado limpio -> mapa de numeros por pixel.
+    nmap, pal = quantize(rgb, n_colors=n_colors, clean_radius=clean_radius)
+    k = len(pal)
+    centers = np.array([p["rgb"] for p in pal], dtype=np.uint8)
 
-    # 2) SUB-TONOS: posterizado FINO (muchos colores) -> da la fidelidad de los
-    #    rellenos. NO genera lineas (los sub-tonos viven dentro de cada numero).
-    fine, _ = quantize(rgb, n_colors=fine_colors, clean_radius=1)
-
-    # 3) SUB-REGIONES = zonas contiguas donde numero Y tono fino son constantes.
-    base = int(fine.max()) + 1
-    combo = nmap.astype(np.int64) * base + fine.astype(np.int64)
-    comp = cc_label(combo, connectivity=1)
+    # 2) Regiones = componentes conexas del mismo numero; se funden las diminutas.
+    comp = cc_label(nmap, connectivity=1)
     uniq = np.unique(comp)
     remap = np.zeros(int(uniq.max()) + 1, dtype=np.int64)
     remap[uniq] = np.arange(len(uniq))
     region_map = remap[comp].astype(np.int32)
     region_map, n = _merge_small(region_map, len(uniq), rgb, min_area_pct=min_piece_pct)
 
-    # 4) Tope de area por clic: subdividir piezas enormes (cielos, fondos).
+    # 3) Tope de area por clic: subdividir piezas enormes (cielos, fondos).
     max_area_px = max(1, int(h * w * (max_cluster_pct / 100.0)))
     region_map, n = _subdivide_large(region_map, n, rgb, max_area_px)
 
-    # 5) Tono REAL de cada sub-region (la fidelidad del resultado final).
-    means = _region_means_u8(region_map, n, rgb)
-
-    # 6) NUMERO de cada sub-region = numero (nmap) mayoritario en sus pixeles.
+    # 4) Numero de cada region = numero mayoritario de sus pixeles.
     flat_r = region_map.ravel()
     flat_n = nmap.ravel().astype(np.int64)
-    counts = np.zeros((n, kN), dtype=np.int64)
+    counts = np.zeros((n, k), dtype=np.int64)
     np.add.at(counts, (flat_r, flat_n), 1)
     numbers = counts.argmax(axis=1).astype(int).tolist()
 
-    # 7) Limpieza: funde los clusters de numero diminutos en su vecino dominante
-    #    (quita 'gusanos' de zonas planas y reduce clics; los rellenos no cambian).
-    areas = np.bincount(region_map.ravel(), minlength=n).astype(np.int64)
-    adj = _region_adjacency(region_map, n)
-    numbers = _merge_small_numbers(adj, n, numbers, areas, int(h * w * (min_cluster_pct / 100.0)))
-
-    # 8) Compacta los numeros usados (algunos pueden quedar vacios tras fundir).
-    used = sorted(set(numbers))
-    nmap_used = {g: i for i, g in enumerate(used)}
-    numbers = [nmap_used[g] for g in numbers]
-    centers = ncenters[used]
-    kU = len(used)
-
-    # 9) Clusters (un clic) contiguos del mismo numero, con tope de area.
+    # 5) Tono REAL por region (fidelidad) + clusters por numero contiguo (clics).
+    means = _region_means_u8(region_map, n, rgb)
     clusters = capped_clusters(region_map, n, numbers, max_area_px)
 
-    # 10) FILLS: multitono = tono fiel de la sub-region; plano = color del numero.
     if multitone:
         fills = [_hex(*means[i]) for i in range(n)]
     else:
         fills = [_hex(*centers[numbers[i]]) for i in range(n)]
 
-    palette = _build_palette(numbers, means, centers, kU, multitone, multitone_spread)
+    palette = _build_palette(numbers, means, centers, k, multitone, multitone_spread)
     return region_map, n, fills, numbers, clusters, palette
 
 
