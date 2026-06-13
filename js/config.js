@@ -7,8 +7,8 @@
 // Guía: docs/SUPABASE_SETUP.md
 window.CM_CONFIG = {
   supabase: {
-    url: "",       // p.ej. "https://xxxxx.supabase.co"
-    anonKey: "",   // la clave "anon public" (NO la service_role)
+    url: "https://exnfpzhitmoyscrttfye.supabase.co",
+    anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4bmZwemhpdG1veXNjcnR0ZnllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODM4MDksImV4cCI6MjA5Njg1OTgwOX0.Q8jj-GTRZV1ffaUomoj59E9_93rMi_tbHbSgQcsq9ps",
   },
 };
 

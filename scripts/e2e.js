@@ -25,11 +25,18 @@ function ok(cond, msg) {
 }
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function newPage(browser, storage = {}) {
+async function newPage(browser, storage = {}, opts = {}) {
   const ctx = await browser.createBrowserContext();   // aislado (storage + SW)
   const page = await ctx.newPage();
   await page.setViewport({ width: 402, height: 874, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.evaluateOnNewDocument((s) => { for (const k in s) localStorage.setItem(k, s[k]); }, storage);
+  if (opts.noSupabase) {
+    // Fuerza el modo "login propio" aunque js/config.js tenga Supabase relleno:
+    // CM_SUPABASE devuelve siempre null y config.js no puede redefinirlo.
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(window, 'CM_SUPABASE', { get: () => () => null, set: () => {} });
+    });
+  }
   await page.goto(BASE, { waitUntil: 'networkidle2', timeout: 30000 });
   await page.evaluate(() => { const el = document.getElementById('backend-url'); if (el) el.value = ''; });
   await sleep(700);
@@ -55,7 +62,7 @@ const visible = (page, sel) => page.evaluate((s) => {
   // ---------------------------------------------------------- S1 · landing
   console.log('S1 · Landing pública');
   {
-    const { ctx, page } = await newPage(browser, { andycolor_consent: CONSENT });
+    const { ctx, page } = await newPage(browser, { andycolor_consent: CONSENT }, { noSupabase: true });
     ok(await visible(page, '#landing-view'), 'la landing es la vista inicial sin sesión');
     const h1 = await page.evaluate(() => document.querySelector('.lp-hero h1').textContent);
     ok(/cuadros para pintar/i.test(h1), 'el hero tiene el titular de marca');
@@ -88,7 +95,7 @@ const visible = (page, sel) => page.evaluate((s) => {
   // -------------------------------------------- S3 · registro y cerrar sesión
   console.log('S3 · Registro, ajustes y cerrar sesión');
   {
-    const { ctx, page } = await newPage(browser, { andycolor_consent: CONSENT, andycolor_tutorial_done: '1' });
+    const { ctx, page } = await newPage(browser, { andycolor_consent: CONSENT, andycolor_tutorial_done: '1' }, { noSupabase: true });
     await page.click('#landing-cta');
     await sleep(300);
     await page.type('#auth-email', 'e2e@test.com');

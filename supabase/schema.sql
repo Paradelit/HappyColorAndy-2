@@ -42,6 +42,9 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- la función es solo para el trigger; que no sea invocable vía API REST (rpc)
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 -- ---------- CREACIONES (cuadros + progreso) ----------
 create table if not exists public.creations (
   id         text   not null,                 -- id de la creación (cliente)
